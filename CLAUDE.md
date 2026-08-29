@@ -411,6 +411,75 @@ one into a file outside `.env.local` — the API routes read everything from `pr
 - `TRANSLATE_API_BASE` / `TRANSLATE_API_KEY` - Point translation at a different OpenAI-compatible provider
 - `TRANSLATE_ALLOWED_ORIGINS` - Extra origins allowed to call `/api/translate-page` (same-origin is always allowed)
 
+### Two repos, and which one deploys the site
+
+**This repo's `origin` is NOT what serves luyi.me.** Get this wrong and you will
+push "a fix" that never reaches production.
+
+| repo | role |
+|---|---|
+| `youayouly/blog` (**private**) — this working tree's `origin` | archive: full history + `workspace/` private notes. Deploys nothing. |
+| `youayouly/luyi.me` (**public**) | **the deployment source for luyi.me** |
+
+Three Vercel projects, and only two of them matter:
+
+| project | git source | serves |
+|---|---|---|
+| `blog` | `youayouly/luyi.me` / `main` | **www.luyi.me** — the real site |
+| `page` | — | apex `luyi.me`, 307s to `www`. Leave it alone; delete it and the bare domain answers nothing. |
+
+**The two histories are unrelated and cannot be merged.** This tree carries the private
+repo's 400+ commits (nearly every one embedding a since-revoked plaintext Dify key in
+`.claude/settings.local.json`); the public repo starts from a single orphan commit.
+So `git push` cannot publish — pushing this history to the public repo would republish
+the leaked-key history, which is the exact thing the split exists to avoid.
+
+Publishing therefore goes through `scripts/sync-public-mirror.mjs`
+(`npm run sync:mirror`): it copies the *current file state* into a clone of the public
+repo, drops ~50 private files (`workspace/`, Cursor-only agent configs, stale one-off
+reports), scans the whole tree for secrets, and only then commits and pushes. **It is
+the release step, not a redundant sync — do not delete it.** Flags are `-m` /
+`--message` (git-style), `--commit`, `--push`.
+
+### Release workflow
+
+```bash
+npm run dev        # localhost:8080 — iterate here
+npm run build      # REQUIRED before publishing (see below)
+npm run sync:mirror -- --commit --push -m "说明"   # → public → Vercel → luyi.me
+```
+
+**`npm run build` before publishing is not optional**, because `dev` and `build` do not
+run the same pipeline:
+
+- `pretranslate.mjs` runs only in `build`. The English-HTML rewrite and the inlined
+  reverse map do not exist under `dev`, so language switching behaves differently there,
+  and you cannot tell whether new Chinese copy made it into the dictionary until a build.
+- Only a build reveals an OOM (this project needs `--max-old-space-size=8192`) and makes
+  the layout guard tests meaningful.
+
+API routes *do* work under `dev` (`lkDevApiPlugin` in `config.js` mounts `api/*.js` on the
+dev server), which is why there is no staging site: a dedicated Vercel test project was
+created and then deleted as redundant. If you need a real preview, push a **branch** to
+the public repo — Vercel builds it as a preview without touching luyi.me. To undo a bad
+release: Vercel → `blog` → Deployments → pick the previous one → Promote to Production.
+
+### Secret scanning (two gates)
+
+The plaintext Dify key above was public for months, so publishing is gated twice:
+
+- `scripts/scan-secrets.mjs`, installed at `.git/hooks/pre-commit` (`--install`), scans
+  the staged diff; `npm run scan:secrets` (`--all`) scans every tracked file.
+- `sync-public-mirror.mjs` re-scans the entire tree before pushing and aborts on a hit.
+
+Two traps are baked into both, and re-introducing either makes the scanner useless:
+the GitHub fine-grained token prefix must be written as a character class, or the
+scanner matches **its own source** and blocks every commit; and placeholder detection
+must run against the **whole line**, because `.env.example` carries
+`GITHUB_TOKEN=ghp_your-github-token-here` — the giveaway sits mid-value, not at the start.
+
+Bypass a genuine false positive with `git commit --no-verify`.
+
 ### Vercel Deployment:
 - API files are copied to root before build via `copy-api.mjs`
 - Build process uses `--max-old-space-size=8192` for memory optimization
