@@ -66,6 +66,11 @@
         </div>
       </div>
     </nav>
+    <p v-if="repoUrl" class="lk-card--mini__star-hint">
+      觉得有帮助的话，给本站点个 Star 吧<span class="lk-card--mini__star-kaomoji" aria-hidden="true"
+        >(๑˃ᴗ˂)✧</span
+      >
+    </p>
     <a
       v-if="repoUrl"
       class="lk-card--mini__star no-external-link-icon"
@@ -79,7 +84,25 @@
           d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.46L12 17.31l-5.8 3.05 1.11-6.46-4.7-4.58 6.49-.94L12 2.5z"
         />
       </svg>
-      <span>给本站点个 Star</span>
+      <span>点个 Star</span>
+      <span v-if="repoStats" class="lk-card--mini__star-stats">
+        <span class="lk-card--mini__star-stat" :title="`${repoStats.stars} stars`">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12" aria-hidden="true">
+            <path
+              d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.46L12 17.31l-5.8 3.05 1.11-6.46-4.7-4.58 6.49-.94L12 2.5z"
+            />
+          </svg>
+          {{ formatCount(repoStats.stars) }}
+        </span>
+        <span class="lk-card--mini__star-stat" :title="`${repoStats.forks} forks`">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12" aria-hidden="true">
+            <path
+              d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"
+            />
+          </svg>
+          {{ formatCount(repoStats.forks) }}
+        </span>
+      </span>
     </a>
   </aside>
 
@@ -212,6 +235,64 @@ defineProps({
   mini: { type: Boolean, default: false },
 })
 
+/**
+ * Star 行右侧的 star / fork 数。走 GitHub 匿名 API（每 IP 60 次/小时），
+ * 结果在 localStorage 缓存 6 小时——这张卡片在首页每次进入都会挂载，实时请求
+ * 很快就会把额度用光，而这两个数字并不需要实时。
+ * 任何一步失败都保持 null、整段不渲染：卡片不能因为拿不到数字而变形或报错。
+ */
+const REPO_STATS_KEY = 'lk_repo_stats'
+const REPO_STATS_TTL = 6 * 60 * 60 * 1000
+const repoStats = ref(null)
+
+/** 1200 → 1.2k，12000 → 12k；数字不是 CJK 文本节点，不进翻译词典 */
+function formatCount(n) {
+  if (!Number.isFinite(n)) return ''
+  if (n < 1000) return String(n)
+  if (n < 10000) {
+    const k = (n / 1000).toFixed(1)
+    return `${k.endsWith('.0') ? k.slice(0, -2) : k}k`
+  }
+  return `${Math.round(n / 1000)}k`
+}
+
+function readCachedStats() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(REPO_STATS_KEY) || 'null')
+    if (!cached || cached.repo !== repoName) return null
+    if (!(Date.now() - cached.at < REPO_STATS_TTL)) return null
+    return { stars: cached.stars, forks: cached.forks }
+  } catch {
+    return null
+  }
+}
+
+async function loadRepoStats() {
+  if (!repoName) return
+  const cached = readCachedStats()
+  if (cached) {
+    repoStats.value = cached
+    return
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repoName}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    const stars = Number(data.stargazers_count)
+    const forks = Number(data.forks_count)
+    if (!Number.isFinite(stars) || !Number.isFinite(forks)) return
+    repoStats.value = { stars, forks }
+    localStorage.setItem(
+      REPO_STATS_KEY,
+      JSON.stringify({ repo: repoName, stars, forks, at: Date.now() })
+    )
+  } catch {
+    /* 限速、离线、localStorage 不可写：保持不渲染即可 */
+  }
+}
+
 const qrSrc = ref(siteConfig.author.wechatQr)
 const qrFailed = ref(false)
 const avatarSrc = useAvatarSrc()
@@ -223,6 +304,7 @@ function onQrError(e) {
 
 onMounted(() => {
   syncAvatarFromStorage()
+  loadRepoStats()
 })
 </script>
 
@@ -853,6 +935,30 @@ onMounted(() => {
   color: #ffffff;
 }
 
+/* 胶囊上方的一行小字：可换行，长句放这里，胶囊本身保持一行 */
+.lk-card--mini__star-hint {
+  margin: 0.7rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  text-align: center;
+  color: rgba(15, 23, 42, 0.62);
+}
+
+/* 颜文字：不含汉字，翻译扫描跳过它，中英文一律原样 */
+.lk-card--mini__star-kaomoji {
+  margin-left: 0.22em;
+  white-space: nowrap;
+  color: #d97706;
+}
+
+[data-theme='dark'] .lk-card--mini__star-kaomoji {
+  color: #fbbf24;
+}
+
+.lk-card--mini__star-hint + .lk-card--mini__star {
+  margin-top: 0.34rem;
+}
+
 /* 底部 Star CTA：整行胶囊，和三枚圆钮同一视觉体系 */
 .lk-card--mini__star {
   display: flex;
@@ -866,6 +972,8 @@ onMounted(() => {
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.2;
+  /* 文案和计数必须同一行：卡片 220px，不加这条中文文案会在 "给本站点个 / Star" 处断行 */
+  white-space: nowrap;
   text-decoration: none;
   color: #7c4a03;
   background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
@@ -897,6 +1005,26 @@ onMounted(() => {
 
 .lk-card--mini__star svg {
   flex: none;
+}
+
+/* star / fork 计数：和文案同一行，用一道竖线隔开；拿不到数字时整段不渲染 */
+.lk-card--mini__star-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.1rem;
+  padding-left: 0.38rem;
+  /* 比文案小一号：卡片只有 220px，中文文案 + 四位数计数要留得下 */
+  font-size: 0.72rem;
+  border-left: 1px solid rgba(217, 119, 6, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.lk-card--mini__star-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  opacity: 0.85;
 }
 
 /* Hope 主题外链 ↗ 箭头：这里也一律隐藏 */
@@ -978,6 +1106,14 @@ onMounted(() => {
   color: #fde68a;
   background: linear-gradient(180deg, rgba(120, 53, 15, 0.55) 0%, rgba(69, 26, 3, 0.6) 100%);
   border-color: rgba(251, 191, 36, 0.35);
+}
+
+[data-theme='dark'] .lk-card--mini__star-hint {
+  color: rgba(226, 232, 240, 0.7);
+}
+
+[data-theme='dark'] .lk-card--mini__star-stats {
+  border-left-color: rgba(251, 191, 36, 0.35);
 }
 
 [data-theme='dark'] .lk-card--mini__star:hover {
