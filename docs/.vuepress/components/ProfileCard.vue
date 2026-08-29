@@ -66,6 +66,21 @@
         </div>
       </div>
     </nav>
+    <a
+      v-if="repoUrl"
+      class="lk-card--mini__star no-external-link-icon"
+      :href="repoUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      :title="`欢迎 Star ⭐ ${repoName}`"
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15" aria-hidden="true">
+        <path
+          d="M12 2.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.46L12 17.31l-5.8 3.05 1.11-6.46-4.7-4.58 6.49-.94L12 2.5z"
+        />
+      </svg>
+      <span>给本站点个 Star</span>
+    </a>
   </aside>
 
   <aside v-else class="lk-card" :class="{ 'lk-card--embedded': embedded }">
@@ -186,6 +201,9 @@ import { siteConfig } from '../site.config.js'
 const author = siteConfig.author
 const githubUrl = `https://github.com/${author.github}`
 const mailtoUrl = `mailto:${author.email}`
+/** 本站开源仓库；小卡片底部的 Star CTA 指向它（siteConfig.repo 为空则不渲染） */
+const repoName = siteConfig.repo || ''
+const repoUrl = repoName ? `https://github.com/${repoName}` : ''
 
 defineProps({
   /** 嵌入侧栏控制面板时：去大阴影与 min-height，占满所在列 */
@@ -835,6 +853,59 @@ onMounted(() => {
   color: #ffffff;
 }
 
+/* 底部 Star CTA：整行胶囊，和三枚圆钮同一视觉体系 */
+.lk-card--mini__star {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  color: #7c4a03;
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+/*
+ * 主题的 `[vp-content] a:not(.header-anchor):hover` 会给正文里所有 a 加下划线，
+ * 它和「类 + scoped 属性 + :hover」同为 (0,3,0)，后加载的它赢。
+ * 按仓库约定不用 !important，改成多带一层父类把特异度抬到 (0,4,0)。
+ */
+.lk-card--mini .lk-card--mini__star:hover,
+.lk-card--mini .lk-card--mini__star:focus,
+.lk-card--mini .lk-card--mini__star:focus-visible,
+.lk-card--mini .lk-card--mini__star:active {
+  text-decoration: none;
+}
+
+.lk-card--mini__star:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #fde68a 0%, #fcd34d 100%);
+  box-shadow: 0 3px 10px rgba(180, 83, 9, 0.25);
+}
+
+.lk-card--mini__star svg {
+  flex: none;
+}
+
+/* Hope 主题外链 ↗ 箭头：这里也一律隐藏 */
+.lk-card--mini__star::after,
+.lk-card--mini__star .external-link-icon {
+  display: none !important;
+  content: none !important;
+}
+
 /* Hope 主题给外链 a 加的 ↗ 小箭头：mini 圆钮里一律隐藏 */
 .lk-card--mini__btn::after,
 .lk-card--mini__btn::before,
@@ -901,5 +972,15 @@ onMounted(() => {
 [data-theme='dark'] .lk-card--mini__btn {
   background: rgba(30, 41, 59, 0.9);
   color: #e2e8f0;
+}
+
+[data-theme='dark'] .lk-card--mini__star {
+  color: #fde68a;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.55) 0%, rgba(69, 26, 3, 0.6) 100%);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+[data-theme='dark'] .lk-card--mini__star:hover {
+  background: linear-gradient(180deg, rgba(146, 64, 14, 0.7) 0%, rgba(120, 53, 15, 0.7) 100%);
 }
 </style>
