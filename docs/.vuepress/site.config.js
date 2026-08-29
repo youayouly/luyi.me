@@ -15,6 +15,8 @@ export const siteConfig = {
   description: '关于产品、技术、留学与生活的个人站点',
   /** 线上域名，用于 canonical / 分享卡片；不带协议 */
   domain: 'luyi.me',
+  /** 本站开源仓库 owner/name；Star 卡片底部的 CTA 指向它 */
+  repo: 'youayouly/luyi.me',
 
   /** 头像同时用作 favicon 与 Hope 主题 logo */
   avatar: '/gallery/avatar-luke-capybara.png',

@@ -16,6 +16,8 @@ const props = defineProps({
 })
 
 const allUrl = `https://github.com/${siteConfig.author.github}?tab=stars`
+/** 本站自己的开源仓库，卡片底部 CTA 指向它 */
+const repoUrl = siteConfig.repo ? `https://github.com/${siteConfig.repo}` : ''
 
 const items = computed(() => starredRepos.slice(0, props.limit))
 
@@ -85,6 +87,18 @@ function langColor(lang) {
         </a>
       </li>
     </ul>
+
+    <a
+      v-if="repoUrl"
+      class="lk-star__cta"
+      :href="repoUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span class="lk-star__cta-icon" aria-hidden="true">⭐</span>
+      <span class="lk-star__cta-text">本站已开源，去点个 Star</span>
+      <span class="lk-star__cta-arrow" aria-hidden="true">→</span>
+    </a>
   </section>
 </template>
 
@@ -215,6 +229,55 @@ function langColor(lang) {
   height: 8px;
   border-radius: 50%;
   flex: none;
+}
+
+/* 底部 CTA：与列表用一条分隔线断开，避免被当成第 7 条 star */
+.lk-star__cta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(109, 40, 217, 0.2);
+  border-radius: 10px;
+  background: rgba(109, 40, 217, 0.06);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #5b21b6;
+  text-decoration: none;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+
+  &:hover {
+    background: rgba(109, 40, 217, 0.12);
+    border-color: rgba(109, 40, 217, 0.34);
+  }
+}
+
+.lk-star__cta-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.lk-star__cta-arrow {
+  flex: none;
+  transition: transform 0.18s ease;
+}
+
+.lk-star__cta:hover .lk-star__cta-arrow {
+  transform: translateX(3px);
+}
+
+[data-theme='dark'] .lk-star__cta {
+  background: rgba(109, 40, 217, 0.22);
+  border-color: rgba(180, 140, 255, 0.34);
+  color: #ddd6fe;
+
+  &:hover {
+    background: rgba(124, 58, 237, 0.34);
+    border-color: rgba(196, 181, 253, 0.5);
+  }
 }
 
 [data-theme='dark'] .lk-star {
