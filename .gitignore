@@ -1,0 +1,36 @@
+node_modules/
+docs/.vuepress/dist/
+docs/.vuepress/.cache/
+docs/.vuepress/.temp/
+.DS_Store
+.vercel
+.env*.local
+# 根 api/ 由 scripts/copy-api.mjs 从 docs/api/ 生成，但**必须提交**：
+# Vercel 是按仓库里的文件决定要打包哪些 Serverless Function 的，构建期才生成的
+# 文件不算数。translate-page.js 之前没进 git，线上就一直 404（红色地球图标的由来）。
+# 改动仍然只写 docs/api/，跑一次 npm run dev / build 后把生成的 api/ 一起提交。
+.npmrc
+.cursor/debug-*.log
+docs/agents/
+docs/skills/
+docs/article/*_backup.md
+docs/article/test-article.md
+scripts/add-covers-to-git.js
+scripts/queue-order-test.mjs
+scripts/test-cover-generation.mjs
+\#
+\{
+形成死循环。
+workspace/cloud/temp/vuepress-dev*.log
+workspace/configs/env/.env
+
+.env*.local
+
+# Playwright MCP 调试时留下的控制台日志
+.playwright-mcp/
+
+# Claude Code 本地设置：只属于这台机器，且历史上曾把明文 API key 写进 permissions.allow
+.claude/settings.local.json
+
+# 各类 AI 工具留下的调试日志（.cursor/debug-*.log 规则加得晚，早期的已被跟踪）
+**/debug-*.log

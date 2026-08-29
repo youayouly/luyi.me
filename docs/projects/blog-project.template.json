@@ -1,0 +1,27 @@
+{
+  "id": "your-project-id",
+  "title": "项目中文标题",
+  "role": "AI 产品",
+  "tag": "短标签",
+  "summary": "卡片一句话摘要（访客可见）",
+  "sortDate": "2026-05-21",
+  "featuredRank": 0,
+  "cover": "/gallery/proj-card-your-project-id-0000000000000.png",
+  "to": "/tech/your-project-id.html",
+  "links": {
+    "github": "https://github.com/youayouly/your-repo",
+    "demo": null
+  },
+  "visibility": {
+    "repo": "public",
+    "demo": "local-only",
+    "showSetup": true
+  },
+  "setup": {
+    "start": "npm start",
+    "url": "http://127.0.0.1:0000/",
+    "ports": [0000],
+    "env": ["仅写本机维护用变量名"],
+    "notes": "可选备注"
+  }
+}

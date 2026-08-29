@@ -1,0 +1,26 @@
+[
+  {
+    "id": "multifeed-news",
+    "repo": "youayouly/news",
+    "branch": "main",
+    "manifestPath": "blog-project.json",
+    "detailFile": "docs/tech/multifeed-news.md",
+    "localPath": "../news"
+  },
+  {
+    "id": "github-console",
+    "repo": "youayouly/github-console",
+    "branch": "main",
+    "manifestPath": "blog-project.json",
+    "detailFile": "docs/tech/github-console.md",
+    "localPath": "../github-console"
+  },
+  {
+    "id": "ai-llm-rag",
+    "repo": null,
+    "branch": "main",
+    "manifestPath": "blog-project.json",
+    "detailFile": "docs/tech/ai-llm-rag.md",
+    "localPath": "../../deep-learning/Rag_abroad"
+  }
+]

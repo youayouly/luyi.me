@@ -1,0 +1,40 @@
+---
+description: VuePress Hope 本站约定（关于页、统计、样式、构建）
+globs: docs/.vuepress/**/*
+alwaysApply: false
+---
+
+# VuePress Hope（Luke 站点）
+
+## 必做检查
+
+- 在 `docs/.vuepress/client.js` 的 `enhance()` 里 `app.component(...)` 注册后，Markdown 里才能写 `<FooBar />`。
+- 改布局/样式后跑 `npm run build` 做回归。
+- **禁止**把 API Key（含硅基流动）写入仓库；只用 `.env.local` + `process.env`，密钥勿出现在聊天可复制区以外的持久化文件。
+
+## 构建期常量（`config.js` + Vite `define`）
+
+- `__LK_ARTICLE_COUNT__`、`__LK_TECH_COUNT__`、`__LK_BUILD_TIME_ISO__` 等仅在构建时注入，组件里当常量用，勿在运行时改 `config.js` 以外逻辑去「伪造」计数。
+
+## 关于页（`AboutPageLayoutV2.vue`）
+
+- 主结构：首屏 Hero + `#about-intro` 内 **主列**（`lk-about-v2-main__col--main`）与 **时间线列**（`lk-about-v2-main__col--timeline`）两列栅格；栅格类名 `lk-about-v2-main__grid--triple`（历史命名，实际为「主 + 时间线」）。
+- **个人卡片 + 简介** 用 `about-profile about-profile--vstack` 上下叠放，**短文推荐** 放在 `lk-about-v2-main__projects` 内，必须在简介**下方**，不要与简介左右并排抢宽。
+- 主列 + 时间线：`lk-about-v2-main__grid--triple` 用 **`1fr` + 固定时间线列宽**；主列容器 `lk-about-v2-main__col--main` 设 **`max-width`（如 920px）+ `justify-self: start`**，避免主区随屏无限变宽把右侧时间线挤出视口。
+- 整页背景：`useHomeBackgroundSrc()`（`homeVisualPref.js`）→ 根节点 `:style` 的 `--lk-about-page-bg`；管理员登录后的背景切换依赖同一套 localStorage，改选项时同步改 `homeBackgroundChoices` 与文档说明。
+- 推荐卡片：`AboutArticleRecommend.vue` 保持「上媒体、下正文 + 底栏元信息」，媒体区高度用 **max-height / aspect-ratio** 约束，避免随视口 `vw` 无限拉高。
+
+## 样式（`styles/index.scss`）
+
+- 自定义类前缀 `lk-`；覆盖 Hope 时用提高选择器特异度或 `:has()`，避免散落的 `!important`。
+- 关于主区宽度：`lk-about-v2-main__grid--triple` / `lk-about-v2-main__projects` 已有 `min()` 与 `max-width` 约束；放宽时优先改 **单一变量**（如 `min(980px,100%)`），不要把整块改成无上限 `100vw` 导致推荐卡片随屏畸形变宽。
+
+## 统计页
+
+- `docs/stats/README.md`：`HomeSidePanel`（可 `hide-site-stats`）+ `StatsEntryGrid` + `StatsBigBoard`；大卡统计与侧栏小块勿重复展示同一组数据。
+- 三栏容器用 `lk-stats-hub lk-stats-hub--triple`：**不要**再给整页加 `max-width: 1100px` 之类居中限制；中间 `StatsEntryGrid` 内也不要写死 `max-width: 960px`，避免大屏左右留白。
+
+## 资源与脚本
+
+- 硅基流动出图：`scripts/gen-about-hero.mjs`（或同类），需网络拉取结果图；失败时站点仍应用 `homeVisualPref` 默认图。
+- 大图放 `docs/.vuepress/public/gallery/`，路径以 `/gallery/...` 引用。

@@ -1,0 +1,218 @@
+// 项目详情 /tech/<slug>：与文章详情 /article/<slug> 同排版（不修改上文 /article/ 规则）
+// Hope 常把 pageClass 挂在正文根上；底栏与移动 gutter 用 data-lk-route 兜底（仅 /tech/ 子路径，不含 hub /tech）
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav {
+  display: grid !important;
+  flex-wrap: nowrap !important;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, var(--lk-article-content-w, 672px));
+  margin-inline: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0 !important;
+  border-top: none !important;
+  min-height: 0 !important;
+}
+
+html[data-lk-route^='/tech/'] main.vp-page:has(aside.vp-sidebar) nav.vp-page-nav {
+  max-width: min(100%, var(--lk-article-shell-w, 708px));
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link {
+  flex-grow: 0 !important;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 0.58rem 0.75rem !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  border: 1px solid rgba(28, 25, 23, 0.1) !important;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09) !important;
+  text-decoration: none !important;
+  color: inherit !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  isolation: isolate;
+  display: block !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link.prev {
+  text-align: left !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link.next {
+  text-align: right !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link:hover {
+  background: #fff !important;
+  border-color: rgba(124, 58, 237, 0.32) !important;
+  box-shadow: 0 10px 26px rgba(91, 33, 182, 0.12) !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link .hint {
+  display: block !important;
+  margin-bottom: 0.22rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  color: #a8a29e !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link .hint .arrow {
+  color: inherit !important;
+}
+
+html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link .link {
+  display: block !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  color: #166534 !important;
+}
+
+@media (max-width: 959px) {
+  html[data-lk-route^='/tech/'] nav.vp-page-nav {
+    gap: 0.65rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  html[data-lk-route^='/tech/']
+    .theme-container:not(.page-article-post):not(.page-article-index):not(.page-about):not(.page-home):not(.page-stats-hub):not(.page-study):not(.page-travel):not(.page-projects):not(.page-tech):has(aside.vp-sidebar)
+    nav.vp-page-nav {
+    width: auto !important;
+    max-width: none !important;
+    margin-inline: clamp(0.65rem, 1.85vw, 1.35rem) !important;
+  }
+
+  html[data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link {
+    padding: 0.52rem 0.62rem !important;
+    border-radius: 16px !important;
+  }
+}
+
+html[data-theme='dark'][data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link {
+  background: linear-gradient(180deg, #0f172a 0%, #0b1222 100%) !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-theme='dark'][data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link:hover {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  border-color: rgba(45, 212, 191, 0.38) !important;
+}
+
+html[data-theme='dark'][data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link .hint {
+  color: #d6d3d1 !important;
+}
+
+html[data-theme='dark'][data-lk-route^='/tech/'] nav.vp-page-nav a.route-link.auto-link .link {
+  color: #99f6e4 !important;
+}
+
+// 项目详情：避免命中「普通 Markdown + 侧栏」的通用实色卡（仅在没有 page-article-post 时的过渡帧）
+html.lk-tech-detail-post
+  .theme-container:not(.page-article-post):has(aside.vp-sidebar)
+  [vp-content]:not(.custom) {
+  margin-inline: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.lk-tech-detail-post .theme-container.page-article-post [vp-content]:not(.custom) {
+  width: min(
+    calc(100% - 2 * var(--lk-article-inline-safe)),
+    var(--lk-article-shell-w)
+  );
+  max-width: var(--lk-article-shell-w);
+  margin-inline: auto;
+  margin-block: 0.2rem 0.65rem;
+  padding: var(--lk-article-post-pad-y, 14px) var(--lk-article-post-pad-x, 18px) 16px;
+  border-radius: 16px;
+  background: #fdfcfa;
+  border: 1px solid rgba(28, 25, 23, 0.12);
+  box-shadow: 0 12px 36px rgba(2, 6, 23, 0.12);
+  box-sizing: border-box;
+}
+
+html.lk-tech-detail-post .theme-container.page-article-post [vp-content] .theme-hope-content {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-theme='dark'] html.lk-tech-detail-post .theme-container.page-article-post [vp-content]:not(.custom) {
+  background: rgba(7, 11, 22, 0.985);
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+}
+
+/* 桌面分栏：与 index.scss 中 .page-article-post @media (min-width:960px) 对齐（仅项目详情） */
+@media (min-width: 960px) {
+  html.lk-tech-detail-post .theme-container.page-article-post {
+    --sidebar-width: var(--lk-article-rail-w);
+    --lk-article-shell-w: min(
+      var(--lk-article-shell-max-w),
+      calc(
+        min(100vw, 100%) - (2 * var(--lk-article-inline-safe)) - var(--lk-article-rail-w) -
+          var(--lk-article-post-gap)
+      )
+    );
+    --lk-article-cluster-w: calc(
+      var(--lk-article-rail-w) + var(--lk-article-post-gap) + var(--lk-article-shell-w)
+    );
+  }
+
+  html.lk-tech-detail-post .theme-container.page-article-post .vp-page {
+    padding-inline: 0 !important;
+  }
+
+  html.lk-tech-detail-post .theme-container.page-article-post:has(aside.vp-sidebar) .vp-page-title,
+  html.lk-tech-detail-post .theme-container.page-article-post:has(aside.vp-sidebar) [vp-content]:not(.custom),
+  html.lk-tech-detail-post .theme-container.page-article-post:has(aside.vp-sidebar) .vp-page-nav {
+    width: min(100%, var(--lk-article-shell-w));
+    max-width: var(--lk-article-shell-max-w);
+    margin-inline-start: max(
+      var(--lk-article-inline-safe),
+      calc(50% - (var(--lk-article-cluster-w) / 2) + var(--lk-article-rail-w) + var(--lk-article-post-gap))
+    );
+    margin-inline-end: auto;
+  }
+
+  /* 须为 flex 列：与 index.scss .page-article-post .vp-sidebar 一致，否则双卡片（项目列表 + 此页内容）无法分栏 */
+  html.lk-tech-detail-post .theme-container.page-article-post .vp-sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--lk-article-sidebar-gap) !important;
+    visibility: visible !important;
+  }
+
+  html.lk-tech-detail-post .theme-container.page-article-post .vp-sidebar-links,
+  html.lk-tech-detail-post .theme-container.page-article-post.lk-article-toc-left .lk-article-toc-dock {
+    width: calc(100% - var(--lk-article-sidebar-card-safe-gap));
+    min-width: 0;
+    max-width: calc(100% - var(--lk-article-sidebar-card-safe-gap));
+    margin-inline-end: auto;
+    box-sizing: border-box;
+  }
+
+  html.lk-tech-detail-post .theme-container.page-article-post .vp-sidebar-links a.lk-sidebar-list-hub {
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.01em;
+    color: #0f766e !important;
+  }
+
+  [data-theme='dark']
+    html.lk-tech-detail-post
+    .theme-container.page-article-post
+    .vp-sidebar-links
+    a.lk-sidebar-list-hub {
+    color: #5eead4 !important;
+  }
+}

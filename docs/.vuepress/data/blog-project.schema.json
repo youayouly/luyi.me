@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "blog-project.json",
+  "description": "外部 GitHub 项目同步到 Luke blog 项目板块的 manifest（放在各项目仓库根目录）",
+  "type": "object",
+  "required": ["id", "title", "role", "tag", "summary", "sortDate", "to", "links", "visibility", "setup"],
+  "properties": {
+    "id": { "type": "string", "description": "与 blog external-projects.registry.json 中 id 一致" },
+    "title": { "type": "string" },
+    "role": {
+      "type": "string",
+      "description": "须为 projectsCatalog roleMapping 中的中文角色键"
+    },
+    "tag": { "type": "string" },
+    "summary": { "type": "string" },
+    "sortDate": { "type": "string", "format": "date" },
+    "featuredRank": { "type": "number" },
+    "cover": { "type": "string", "description": "blog 内路径，如 /gallery/proj-card-xxx.png" },
+    "to": { "type": "string", "description": "详情页，如 /tech/slug.html" },
+    "links": {
+      "type": "object",
+      "properties": {
+        "github": { "type": "string", "format": "uri" },
+        "demo": { "type": ["string", "null"], "format": "uri" }
+      }
+    },
+    "visibility": {
+      "type": "object",
+      "required": ["repo", "demo", "showSetup"],
+      "properties": {
+        "repo": { "enum": ["public", "private", "hidden"] },
+        "demo": { "enum": ["public", "local-only", "none"] },
+        "showSetup": { "type": "boolean" }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "string" },
+        "url": { "type": "string" },
+        "ports": { "type": "array", "items": { "type": "number" } },
+        "env": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

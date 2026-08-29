@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.48" stop-color="hsl(52, 72%, 38%)"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="32%" cy="22%" r="60%">
+      <stop offset="0" stop-color="hsl(10, 74%, 54%)" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="hsl(10, 74%, 54%)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect width="1200" height="800" fill="url(#glow)"/>
+  <g fill="none" stroke="rgba(255,255,255,.16)" stroke-width="2">
+    <path d="M120 560 C280 430 390 610 540 480 S820 290 1060 390"/>
+    <path d="M160 250 H1040 M210 310 H990 M280 370 H920"/>
+  </g>
+  <circle cx="900" cy="170" r="92" fill="rgba(255,255,255,.08)"/>
+  <circle cx="990" cy="250" r="36" fill="rgba(255,255,255,.13)"/>
+  <text x="92" y="292" fill="rgba(255,255,255,.24)" font-family="Arial, sans-serif" font-size="180" font-weight="800">AI</text>
+  <text x="96" y="610" fill="white" font-family="Arial, sans-serif" font-size="44" font-weight="800">ai模板</text>
+  <text x="100" y="672" fill="rgba(255,255,255,.78)" font-family="Arial, sans-serif" font-size="28" font-weight="600">AI / Vue</text>
+</svg>
