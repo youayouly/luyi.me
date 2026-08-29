@@ -22,7 +22,8 @@
     "article:new": "node scripts/article.mjs new",
     "article:push": "node scripts/article.mjs push",
     "article:status": "node scripts/article.mjs status",
-    "sync:stars": "node scripts/sync-starred.mjs"
+    "sync:stars": "node scripts/sync-starred.mjs",
+    "sync:mirror": "node scripts/sync-public-mirror.mjs"
   },
   "keywords": [],
   "author": "",
