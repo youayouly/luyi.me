@@ -50,57 +50,48 @@ export const recommendedArticles = [
  * Timeline items are intentionally broader than article recommendations:
  * articles, batch publish/delete operations, and release fixes can all appear
  * here so the About page works like a compact project activity log.
+ *
+ * 按天从 `git log` 里挑真实发生过的里程碑手动摘要，同一天有多条就合并成一条——
+ * AboutTimeline.vue 只取最新 10 条，条目太碎反而看着像重复。日期都是真实提交
+ * 日期，不是拍脑袋填的；同一天出现两次是因为那天真的做了两件不相关的事。
  */
 export const timelineItems = [
   {
-    date: '2026-04-22',
-    title: 'Projects 页面完成 PM 作品集前置、岗位项目分页和星系背景升级',
-    href: '/tech/',
-    category: 'Projects',
+    date: '2026-08-29',
+    title: '留言板上线：友链墙、表情回应、地区标签、邮箱验证码、草稿自动保存一次做完',
+    href: '/guestbook',
   },
   {
-    date: '2026-04-22',
-    title: '发布 Projects 分页与星系背景迭代记录',
-    href: '/article/pm-projects-pagination-galaxy.html',
-    category: 'Article',
+    date: '2026-08-29',
+    title: '首页加 Star 本站仓库入口，仓库开源并接入发布同步脚本与密钥扫描',
   },
   {
-    date: '2026-04-22',
-    title: '发布 PM Portfolio PRD 与 AI Key 路由两篇文章',
-    href: '/article/pm-portfolio-prd.html',
-    category: 'Article',
+    date: '2026-08-28',
+    title: '修好浏览器内置翻译卡死、文章卡片误弹图片灯箱等一批线上问题',
   },
   {
-    date: '2026-04-21',
-    title: '整理 Git / Release 操作说明，补齐发布流水线文档',
-    href: '/article/git-release-map.html',
-    category: 'Docs',
+    date: '2026-08-28',
+    title: 'ApplyScribe RAG 项目接入外部同步，详情页换成真实实现',
+    href: '/tech/ai-llm-rag.html',
   },
   {
-    date: '2026-04-21',
-    title: '修复生成封面随文章一起发布，避免 Vercel 找不到图片',
-    category: 'Release',
+    date: '2026-08-27',
+    title: '语言入口收进设置面板，修好移动端汉堡按钮和文章工具条重叠',
   },
   {
-    date: '2026-04-21',
-    title: '收敛 blog-v1：删除测试短文，保留可发布文章索引',
-    category: 'Article',
+    date: '2026-08-26',
+    title: '站长单会话登录上线，构建期直出英文 HTML，首屏不再闪中文',
   },
   {
-    date: '2026-04-20',
-    title: '提交封面图片资源，解决云端构建缺失文件问题',
-    category: 'Deploy',
+    date: '2026-08-24',
+    title: '首屏同步译文，主题切换与项目详情跳转体验修复一批',
   },
   {
-    date: '2026-04-12',
-    title: 'Edge AI 部署流水线的几笔记录',
-    href: '/article/edge-ai-sketch.html',
-    category: 'Article',
+    date: '2026-08-23',
+    title: '构建期页面翻译上线，修好因改名漏部署的翻译接口',
   },
   {
-    date: '2026-04-02',
-    title: '用 VuePress 2 搭静态个人站',
-    href: '/article/vuepress-stack-notes.html',
-    category: 'Article',
+    date: '2026-08-21',
+    title: '导航栏加运行时翻译开关，站点语言按浏览器自动识别',
   },
 ]

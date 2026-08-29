@@ -43,6 +43,7 @@ export const siteConfig = {
     { text: '首页', href: '/' },
     { text: '项目', href: '/tech/' },
     { text: '文章', href: '/article/' },
+    { text: '留言板', href: '/guestbook' },
     { text: '关于我', href: '/about' },
   ],
 

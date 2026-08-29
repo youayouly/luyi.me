@@ -5621,6 +5621,22 @@ main.vp-page:has(.lk-about-fullbleed),
   position: relative;
   z-index: 0;
   isolation: isolate;
+  /*
+   * --lk-about-pull/push（236px / 276px）来自 `.about-page-layout` 那套「时间线 220px |
+   * 主内容 | 分类 260px」旧三栏设计——现在站内没有任何组件渲染 `.about-page-layout`，
+   * 那套布局已经是死代码，但 `.lk-about-fullbleed` 这两个变量仍然生效，把这个类整体往
+   * 右推偏了 (276-236)/2 = 20px。`.lk-about-v2-hero` / `.lk-about-v2-main` 各自还有一层
+   * viewport-anchored 的居中，但那层只能按父级的「宽度」重新居中，纠正不了父级本身
+   * 「不在视口正中」这件事，所以两个大栅格最终还是带着这 20px 偏移，左右留白肉眼可见不等宽。
+   * 手机断点（见下方 lk-about-mobile-layout mixin）早就把这两个变量清零了，这里对桌面端
+   * 做同样的事，从根上让 .lk-about-fullbleed 自己保持对称，两层居中就不用互相纠偏。
+   */
+  --lk-about-pull: 0px;
+  --lk-about-push: 0px;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* fullbleed wrapper：背景统一由 <body> 的全局 fixed bg 承担 */
@@ -5696,6 +5712,26 @@ main.vp-page:has(.lk-aboutme) .theme-hope-content {
 .page-about-me .vp-page-title,
 main.vp-page:has(.lk-aboutme) .vp-page-title {
   display: none !important;
+}
+
+/* 留言板：GuestbookBoard 自己有「发送留言」等小标题，顶部大标题 + 面包屑多余 */
+.page-guestbook .vp-page-title,
+main.vp-page:has(.lk-gb-page) .vp-page-title,
+.page-guestbook .vp-breadcrumb,
+main.vp-page:has(.lk-gb-page) .vp-breadcrumb {
+  display: none !important;
+}
+
+/*
+ * [vp-content] 默认给正文一个 780px 的「阅读宽度」上限（外加左右 padding），
+ * 跟 /about（.lk-aboutme）一样，GuestbookBoard 自己管两栏宽度，这层默认上限只会
+ * 把 .lk-gb-page 的 1220px max-width 提前掐死——两栏就会被压扁成一窄条。
+ */
+.page-guestbook [vp-content]:not(.custom),
+main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
+  max-width: none !important;
+  width: 100% !important;
+  padding-inline: 0 !important;
 }
 
 .theme-container.page-about-me,
@@ -6180,10 +6216,13 @@ main.vp-page:has(.lk-aboutme) .vp-page-title {
 
 .lk-about-v2-hero {
   position: relative;
-  width: 100vw;
+  /* --lk-vw（client.js 里的 syncViewportWidthVar）是刨掉滚动条的真实视口宽度；
+     裸 100vw 在 Windows Chrome/Edge 上比它宽出一条滚动条，会把这块整体推偏，
+     导致居中后左右留白不等宽，回退值保留 JS 跑之前的旧行为。 */
+  width: var(--lk-vw, 100vw);
   max-width: none;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: calc(50% - (var(--lk-vw, 100vw) / 2));
+  margin-right: calc(50% - (var(--lk-vw, 100vw) / 2));
   min-height: min(92vh, 820px);
   border-radius: 0;
   overflow: hidden;
@@ -6426,11 +6465,13 @@ button.lk-about-v2-hero__btn {
      父级 .lk-about-fullbleed 的 --lk-about-pull/push 为旧版三栏设计，
      左 -236 / 右 -276 不对称会把中心推到视口中心右侧 ~20px，
      导致 V2 grid 用 margin-inline:auto 时右侧时间线被视口裁切。
-     这里把 main 拉回 100vw 并以视口中心居中，子栅格再 margin-inline:auto 即可真正居中。 */
-  width: 100vw;
+     这里把 main 拉回视口宽度并以视口中心居中，子栅格再 margin-inline:auto 即可真正居中。
+     用 --lk-vw 而不是裸 100vw：后者在有滚动条时比真实视口宽，会把这次「拉回居中」
+     本身再带偏 ~15px，导致三栏区域左右留白不对称（左宽右窄）。 */
+  width: var(--lk-vw, 100vw);
   max-width: none;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: calc(50% - (var(--lk-vw, 100vw) / 2));
+  margin-right: calc(50% - (var(--lk-vw, 100vw) / 2));
   box-sizing: border-box;
 }
 

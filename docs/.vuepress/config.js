@@ -308,6 +308,7 @@ export default defineUserConfig({
       { text: '首页', link: '/' },
       { text: '项目', link: '/tech/' },
       { text: '文章', link: '/article/' },
+      { text: '留言板', link: '/guestbook' },
       { text: '关于我', link: '/about' },
     ],
 

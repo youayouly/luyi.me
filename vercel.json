@@ -12,6 +12,7 @@
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/assets/:path*", "destination": "/assets/:path*" },
     { "source": "/about", "destination": "/about.html" },
+    { "source": "/guestbook", "destination": "/guestbook.html" },
     { "source": "/article", "destination": "/article/index.html" },
     { "source": "/article/", "destination": "/article/index.html" }
   ],

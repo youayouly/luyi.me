@@ -2,8 +2,6 @@
 import NoticeCard from './NoticeCard.vue'
 import SiteStatsCard from './SiteStatsCard.vue'
 import VisitedChinaFootprints from './VisitedChinaFootprints.vue'
-import FriendLinks from './FriendLinks.vue'
-import StarredRepos from './StarredRepos.vue'
 import { siteConfig } from '../site.config.js'
 
 const author = siteConfig.author
@@ -52,8 +50,6 @@ function openWechatPopup() {
           embedded
           class="lk-aboutme__card lk-aboutme__card--stats"
         />
-        <StarredRepos :limit="6" class="lk-aboutme__card lk-aboutme__card--stars" />
-        <FriendLinks class="lk-aboutme__card lk-aboutme__card--friends" />
       </aside>
 
       <main class="lk-aboutme__main" aria-label="关于我正文">

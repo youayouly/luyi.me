@@ -19,6 +19,7 @@ import VisitedChinaFootprints from './components/VisitedChinaFootprints.vue'
 import StatsEntryGrid from './components/StatsEntryGrid.vue'
 import StatsBigBoard from './components/StatsBigBoard.vue'
 import ArticleIndexList from './components/ArticleIndexList.vue'
+import GuestbookBoard from './components/GuestbookBoard.vue'
 import ProjectPortfolio from './components/ProjectPortfolio.vue'
 import ProductManagerCases from './components/ProductManagerCases.vue'
 import ProjectsSidebarFilters from './components/ProjectsSidebarFilters.vue'
@@ -859,6 +860,20 @@ function syncAboutProfileCenterClass() {
   else root.removeAttribute(ABOUT_PROFILE_CENTER_ATTR)
 }
 
+/**
+ * `100vw` includes the scrollbar (Chrome/Edge on Windows), but `document.documentElement.clientWidth`
+ * doesn't. The About/home hero and main sections break out to full-bleed width via
+ * `width: 100vw; margin-left/right: calc(50% - 50vw)` (see index.scss `.lk-about-v2-hero` /
+ * `.lk-about-v2-main`), and that mismatch shifted the whole recentred block ~15px right of true
+ * center — left/right gaps ended up visibly unequal. `--lk-vw` is the scrollbar-excluded width;
+ * the SCSS falls back to raw `100vw` until this runs once on mount.
+ */
+function syncViewportWidthVar() {
+  if (typeof document === 'undefined') return
+  const w = document.documentElement?.clientWidth || window.innerWidth || 0
+  if (w) document.documentElement.style.setProperty('--lk-vw', `${w}px`)
+}
+
 function syncPhoneViewportClass() {
   if (typeof document === 'undefined') return
   const root = document.documentElement
@@ -968,6 +983,7 @@ function attachPhoneViewportListeners() {
   if (typeof window === 'undefined' || phoneViewportListenersAttached) return
   phoneViewportListenersAttached = true
   phoneViewportHandler = () => {
+    syncViewportWidthVar()
     syncPhoneViewportClass()
     syncQuarkBrowserClass()
     syncHuaweiBrowserClass()
@@ -2759,6 +2775,7 @@ export default defineClientConfig({
     app.component('HomeSidePanel', HomeSidePanel)
     app.component('ProfileCard', ProfileCard)
     app.component('ArticleIndexList', ArticleIndexList)
+    app.component('GuestbookBoard', GuestbookBoard)
     app.component('ProjectPortfolio', ProjectPortfolio)
     app.component('ProductManagerCases', ProductManagerCases)
     app.component('ProjectsSidebarFilters', ProjectsSidebarFilters)

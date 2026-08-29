@@ -151,10 +151,11 @@ Endpoints:
 - `/api/login` - Admin login/logout/session status. See **Admin session** below.
 - `/api/visit` - Public; records one visit into Redis. See **Visitor log** below.
 - `/api/visitor-log` - Admin-only; reads the visit log and counters.
+- `/api/guestbook` - Public read/write for the guestbook, admin-only delete. See **Guestbook** below.
 
 **Shared server code lives in `lib/`, not `docs/api/`.** Every file in `api/` becomes a
 Serverless Function, so a helper placed there would deploy as a handler-less function.
-All four files there sit outside `api/` and are pulled in by relative `require`, which
+Every file there sits outside `api/` and is pulled in by relative `require`, which
 `@vercel/nft` traces into the bundle:
 
 | file | what | used by |
@@ -163,6 +164,9 @@ All four files there sit outside `api/` and are pulled in by relative `require`,
 | `lk-admin-auth.js` | session issue/verify/renew, credential fallback, login log | login + every write endpoint |
 | `lk-ua.js` | `clientIp()` + `parseUa()` — device/OS/browser/bot from the UA, no npm dep | login, visit |
 | `lk-visit-classify.js` | `classifyVisits()` — human-vs-bot score per visit row | visitor-log |
+| `lk-markdown.js` | escape-first mini Markdown → safe HTML | guestbook |
+| `lk-guest.js` | nickname/contact cleanup, QQ + Gravatar avatars, email masking | guestbook |
+| `lk-mail.js` | Resend REST wrapper; no-ops without a key | guestbook |
 
 `lk-ua.js`'s header documents what model detection *cannot* do (frozen iOS UA, Chrome
 ≥110 Android UA reduction) so nobody re-litigates it. `lk-visit-classify.js` scores
@@ -291,6 +295,13 @@ rendering. Redis keys:
 | `lk:admin:session` | the single admin session (see above) |
 | `lk:admin:logins` | admin login attempts, capped at 50 |
 | `lk:admin:fail:<ip>` | failed-login counter, 15min TTL |
+| `lk:gb` | guestbook messages, capped at 500 |
+| `lk:gb:rate:<ip>:<window>` | 5 posts / 10 min per IP |
+| `lk:gb:cool:<vid>` | 30s cooldown between two posts from one device |
+| `lk:gb:react` | reaction counts, field `<id>:<emoji>` |
+| `lk:gb:rx:<vid>:<id>:<emoji>` | one reaction per device per message, 180d |
+| `lk:gb:code:<emailHash>` | pending verification code, 10min |
+| `lk:gb:codecool:<emailHash>` / `lk:gb:codereq:<ip>:<hour>` | code cooldown and per-IP quota |
 
 **The owner's own visits are not recorded as visits at all.** `reportVisit` self-reports `owner: true` when the local auth flag is set; `/api/visit` then skips the detail list, PV, UV and the visitor profiles entirely and instead keeps one field per device in `lk:owner`, overwritten in place (`lk:owner:hits` counts them), capped at `OWNER_MAX` devices. It deliberately **skips the 30s dedupe lock** — that row is a live "where am I right now", and half a minute of staleness would defeat it. `owner` is client-asserted and grants nothing: faking it only removes you from the statistics. `/api/visitor-log` returns those rows as `owner`, the admin panel shows them as 我的设备 above the log, and legacy rows carrying `owner: true` are filtered out of `recent`.
 
@@ -326,6 +337,105 @@ because the point is to spend as little as possible on traffic that will be thro
 The layer that actually absorbs volume is a Vercel Firewall rate-limit rule, which drops
 the request before the function runs — no invocation, no Upstash commands. The four gates
 above are the backstop, not the primary defense.
+
+### Guestbook
+
+`/guestbook` (`docs/guestbook.md` → `GuestbookBoard.vue`) plus one endpoint,
+`docs/api/guestbook.js`. **There is no login.** Visitors type a nickname and optionally
+an email or QQ number; the avatar is guessed from whatever they typed —
+`q1.qlogo.cn` for a QQ number (and for a QQ mailbox, which has a far better hit rate
+than Gravatar), `cravatar.cn` (the China mirror of Gravatar, protocol-identical and not
+blocked) for anything else, nothing at all otherwise, which renders as a lettered
+circle. That means identity is *self-asserted* — the defenses are the rate limits, the
+length caps, and the owner being able to delete, not authentication. OAuth was
+considered and dropped: QQ Connect needs a business licence, and Google would put
+`accounts.google.com` in front of mainland visitors.
+
+The one thing that is **not** self-asserted is the 站长 badge: `owner` is written
+server-side only after `verifyAdmin` passes, so posting `owner: true` from the client
+buys nothing. A test asserts this.
+
+**`lib/lk-markdown.js` is the only thing standing between a visitor and the DOM**, because
+the component renders the stored HTML with `v-html`. It works escape-first: the whole
+string is HTML-escaped, *then* the handful of Markdown rules add tags back. So a
+`<script>` is already `&lt;script&gt;` before any rule runs and there is no "filter" to
+leak through — which is why it needs neither markdown-it nor DOMPurify, and why the
+`api/` zero-dependency rule survives. Links are http(s)-only and always get
+`rel="nofollow noopener noreferrer"`. **Do not move Markdown parsing to the client**;
+that relocates the only defense to where the attacker is.
+
+Gates on `POST`, cheapest first, same shape as `/api/visit`: same-site `Origin` (falling
+back to `Referer`, and *not* waving through a missing one) → a CSS-hidden `website`
+honeypot → crawler UA → `RATE_MAX` 5 posts per 10 min per IP and a 30s per-device
+cooldown. The first three return a fake `{ok:true}` and store nothing; the rate limits
+return a real 429, because unlike a page view a post is a deliberate act — silently
+dropping it makes people retype and resend.
+
+Privacy: the email is stored as **md5 only** (that is all the avatar needs); the plaintext
+is kept *only* when the visitor ticked 回复邮件提醒, since a reminder cannot be sent
+without it. Neither view ever returns it — the admin sees `abc***@qq.com`. 悄悄话 rows
+come back to anonymous callers as a stub with `html: ''` and `redacted: true`, so the
+author can see their message landed without anyone else reading it.
+
+Replies are **one level**: replying to a reply re-parents to the same top-level message,
+so the thread can never nest into a staircase. Deleting a parent takes its replies with
+it, or they would be orphaned rows that nothing renders.
+
+Mail is `lib/lk-mail.js` → Resend, and it **no-ops without `RESEND_API_KEY` /
+`LK_MAIL_FROM`**. That is deliberate: a failed send must never turn into a failed
+message. Until those two vars are set, ticking 回复邮件提醒 stores the address and
+sends nothing.
+
+Two client-side details worth knowing: visitor content carries `data-lk-no-translate`
+(it is runtime content, so the build dictionary can never hold it and the runtime
+endpoint would just burn latency), and the **placeholders carry their own zh/en pair**
+keyed off `pageLang` — `pageTranslate.js` walks text nodes, so attributes are invisible
+to it. The labels that only render in a branch (回复态, empty state, per-message
+buttons) are registered in `scripts/lib/runtime-strings.mjs`, like every other
+runtime-built string.
+
+The page is a single column: composer → 友链 wall → 友链 application → message list.
+The wall renders `data/friendLinks.js` — the same array the about-page `FriendLinks` card
+uses, so one entry updates both places; only the presentation differs (grid vs. narrow
+list), which is why this page does not import that component. The application card's button
+fills the composer with a template: a friend-link request **is** an ordinary guestbook
+message, so there is no second form, no second endpoint, and no second thing to rate-limit.
+The flow is deliberately "comment first, link second" — the requester does not have to add
+this site before asking; the reply (plus its email notification, if they ticked it) is what
+closes the loop.
+
+Three later additions, all sharing the same gates:
+
+- **Reactions.** Counts live in one HASH, `lk:gb:react`, field `<id>:<emoji>` — *not* inside
+  the message row, because a row is one JSON string in a LIST and editing it would mean
+  LREM + LPUSH, which reorders the board. The emoji is a **four-item allowlist**: the value
+  becomes a Redis field name and lands in the page, so anything else is refused. One device
+  gets one shot per (message, emoji) via `SET NX` on `lk:gb:rx:<vid>:<id>:<emoji>` — the
+  client's `localStorage` only lights the button up. Deleting a message `HDEL`s its fields,
+  or they outlive it as orphans.
+- **Place badge.** The row stores `country`/`region` from the `x-vercel-ip-*` headers and
+  **never the city**; `data/placeNames.js` maps the codes to 「广东」/「新加坡」. It carries
+  both languages because this is runtime data that can never reach the build dictionary —
+  same reason `SiteFooter` does.
+- **Owner notification.** `LK_MAIL_TO` gets a mail per new message. Unset = skipped, like
+  every other path through `lk-mail.js`.
+- **Email verification is optional.** `action: 'send-code'` mails a six-digit code
+  (`crypto.randomInt`, not `Math.random`) to `lk:gb:code:<emailHash>` for 10 minutes, behind
+  a 60s per-address cooldown and 5/hour per IP — mail costs money, so this gate is tighter
+  than the posting one. Posting *with* a code that matches sets `verified` and deletes the
+  key (one code, one message); posting with a **wrong** code is a 400, and posting with no
+  code is fine — it just gets no badge. Unlike everywhere else, an unconfigured mailer here
+  returns a real 503 with `needsMail`: a message must never be lost, but a code that
+  silently never arrives leaves someone waiting forever. `GET` reports `mailReady` so the
+  client hides the button rather than offering one that 503s.
+
+`tests/guestbook.test.mjs` runs the endpoint against the in-memory Upstash fake
+(21 cases: degradation, gates, length cap, per-IP rate limit, two rounds of XSS, reactions,
+verification codes,
+place-code exposure, mail degradation, privacy,
+owner spoofing, delete auth, threading). The XSS round asserts against a **tag allowlist**
+rather than searching for dangerous substrings — escaped text legitimately contains
+`onload=`, and a substring check flags that as a leak.
 
 ### Key Scripts:
 - `scripts/copy-api.mjs` - Copies API files to root for Vercel deployment
@@ -409,6 +519,8 @@ one into a file outside `.env.local` — the API routes read everything from `pr
 - `KV_REST_API_URL` / `KV_REST_API_TOKEN` - Upstash Redis, injected by the Vercel Marketplace integration. Backs the admin session and the visitor log. `UPSTASH_REDIS_REST_URL` / `_TOKEN` are accepted as aliases. Without them `/api/login` returns 503 and `/api/visit` silently no-ops.
 - `TRANSLATE_MODEL` - Override the translation model (default `Qwen/Qwen3-30B-A3B-Instruct-2507`; avoid thinking-mode models, they are ~10x slower)
 - `TRANSLATE_API_BASE` / `TRANSLATE_API_KEY` - Point translation at a different OpenAI-compatible provider
+- `LK_MAIL_TO` - Where "someone left a message" mails go. Unset = not sent; reply reminders to visitors are unaffected.
+- `RESEND_API_KEY` / `LK_MAIL_FROM` - Guestbook reply notifications. Unset = the address is stored and nothing is sent; a message never fails because mail failed.
 - `TRANSLATE_ALLOWED_ORIGINS` - Extra origins allowed to call `/api/translate-page` (same-origin is always allowed)
 
 ### Two repos, and which one deploys the site

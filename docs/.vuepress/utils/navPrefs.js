@@ -52,6 +52,14 @@ export const navbarPageOptions = [
     },
   },
   {
+    id: 'guestbook',
+    label: '留言板',
+    matches: (path) => {
+      const p = normPath(path)
+      return p === '/guestbook' || p.startsWith('/guestbook/')
+    },
+  },
+  {
     id: 'stats',
     label: '统计',
     matches: (path) => {
