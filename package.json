@@ -23,7 +23,8 @@
     "article:push": "node scripts/article.mjs push",
     "article:status": "node scripts/article.mjs status",
     "sync:stars": "node scripts/sync-starred.mjs",
-    "sync:mirror": "node scripts/sync-public-mirror.mjs"
+    "sync:mirror": "node scripts/sync-public-mirror.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "keywords": [],
   "author": "",
