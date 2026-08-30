@@ -89,10 +89,6 @@
 
       <div class="lk-gb__options">
         <label class="lk-gb__check">
-          <input v-model="form.private" type="checkbox" />
-          <span>悄悄话</span>
-        </label>
-        <label class="lk-gb__check">
           <input v-model="form.notify" type="checkbox" />
           <span>回复邮件提醒</span>
         </label>
@@ -152,10 +148,10 @@
         {{ notice }}<span v-if="!noticeBad" aria-hidden="true"> (๑˃ᴗ˂)✧</span>
       </p>
       <p v-if="!isEnglish" class="lk-gb__hint">
-        支持 <code>**粗体**</code>、<code>`代码`</code>、<code>&gt; 引用</code> 和链接。悄悄话只有站长看得见。
+        支持 <code>**粗体**</code>、<code>`代码`</code>、<code>&gt; 引用</code> 和链接。
       </p>
       <p v-else class="lk-gb__hint">
-        Supports <code>**bold**</code>, <code>`code`</code>, <code>&gt; quote</code>, and links. Whispers are only visible to the site administrator.
+        Supports <code>**bold**</code>, <code>`code`</code>, <code>&gt; quote</code>, and links.
       </p>
     </section>
 
@@ -169,8 +165,7 @@
     </section>
 
     <!-- 测试留言：跟发送框同一栏，目前是开发期留的测试数据（Zephyr / octocat 那些
-         带 [TEST] 前缀的），不是真实访客发的。悄悄话游客看不到，不放在这一栏里，
-         免得它的高度牵连上面「左栏跟右栏对齐」的伸展计算——见下面整行的 lk-gb-whispers。 -->
+         带 [TEST] 前缀的），不是真实访客发的。 -->
     <GuestbookThreadList
       :title="isEnglish ? '💬 Test Comments' : '💬 测试留言'"
       :threads="publicThreads"
@@ -243,26 +238,6 @@
 
     <AiAssistantWidget class="lk-gb-assistant" />
     </div>
-
-    <!-- 悄悄话：单独一整行，横跨两栏，放在左右栏下面——游客看不到这部分内容，
-         它的高度不该影响上面左栏（含 AI 问答）跟右栏对齐时的伸展计算。 -->
-    <section class="lk-gb-whispers">
-    <GuestbookThreadList
-      :title="isEnglish ? '🤫 Whispers' : '🤫 悄悄话'"
-      :threads="privateThreads"
-      :is-logged-in="isLoggedIn"
-      :empty-text="isEnglish ? 'No whispers yet.' : '还没有悄悄话。'"
-      :avatar-of="avatarOf"
-      :initial="initial"
-      :place-of="placeOf"
-      :format-date="formatDate"
-      :has-reacted="hasReacted"
-      :failed-avatars="failedAvatars"
-      @react="react"
-      @reply="startReply"
-      @remove="remove"
-    />
-    </section>
     </div>
 
   </div>
@@ -362,7 +337,6 @@ const form = reactive({
   site: '',
   code: '',
   content: '',
-  private: false,
   notify: false,
   website: '',
 })
@@ -382,8 +356,11 @@ const threads = computed(() => {
   }))
 })
 
-/** 悄悄话跟公开留言分两栏显示：按 private 拆，回复跟着父留言走，不单独拆。 */
-const privateThreads = computed(() => threads.value.filter((top) => top.private))
+/*
+ * 悄悄话功能暂时下线（composer 不再有勾选框，这里也不再单独渲染一栏），
+ * 但仍然把 private:true 的行过滤掉，不混进公开列表——万一旧数据或后端还留着
+ * 这类行（api/guestbook.js 的 private 处理没动，只是前端先不暴露入口）。
+ */
 const publicThreads = computed(() => threads.value.filter((top) => !top.private))
 
 function say(text, bad = false) {
@@ -607,7 +584,6 @@ async function submit() {
           site: form.site,
           code: form.code,
           content: form.content,
-          private: form.private,
           notify: form.notify,
           website: form.website,
           parent: replyTo.value ? replyTo.value.id : '',
@@ -680,9 +656,6 @@ onMounted(() => {
  * 桌面宽度靠 grid order 把视觉顺序换成「main 在左、rail 在右」，
  * 和 /tech、/article 页一样中间两栏分布。
  * 断点提到 1200px：右栏变宽后，更窄的话会把左边挤没。
- * 悄悄话（lk-gb-whispers）不算进这两栏——游客看不到它，它单独占一整行放在
- * 两栏下面，这样左栏（含 AI 问答）跟右栏的 stretch 高度只看「组成 + 公开留言」，
- * 不会被悄悄话的高度拖长。
  */
 .lk-gb-page {
   display: flex;
@@ -728,8 +701,7 @@ onMounted(() => {
   .lk-gb-main {
     order: 1;
     /* 最后一张卡 flex:1 1 auto 把 stretch 让出来的高度填成自己的卡片背景。
-       不设 position:sticky——试过（连同 .lk-gb-whispers 单独拆一个 grid 隔离
-       包含块）发现这条浏览器规则：sticky 元素如果被 align-items:stretch 撑到
+       不设 position:sticky——试过发现这条浏览器规则：sticky 元素如果被 align-items:stretch 撑到
        跟兄弟一样高（height 正好等于包含块高度），sticky 就完全失效、退化成
        普通静态定位——因为「贴住视口」需要元素比包含块矮，留出可以贴着滑动
        的余量，撑满之后没有余量可言。两个目标（撑到跟右栏一样高 / 滚动时贴
@@ -740,14 +712,6 @@ onMounted(() => {
   .lk-gb-main > :last-child {
     flex: 1 1 auto;
   }
-
-  /* 悄悄话独占一整行，横跨两栏——它不参与上面这一行 stretch 的高度计算，
-     所以左栏（含 AI 问答）的伸展只跟着右栏「组成 + 真实留言占位 + 公开留言」走，
-     不会被游客看不见的悄悄话拖长。 */
-  .lk-gb-whispers {
-    order: 3;
-    grid-column: 1 / -1;
-  }
 }
 
 .lk-gb-rail,
@@ -755,10 +719,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
-  min-width: 0;
-}
-
-.lk-gb-whispers {
   min-width: 0;
 }
 

@@ -144,6 +144,15 @@ watch(
   width: 100%;
 }
 
+/* AI 卡片自己的固定高度：main 列（分页项目卡）实测高度减去分类卡实测高度，
+   让常见情况下两栏底边大致齐平，写死的数字，不随当前这页项目多少而变。
+   三个 class 叠起来是为了压过 AiAssistantWidget 自己 <style scoped> 里
+   .lk-ai-asst 规则编译后的 .lk-ai-asst[data-v-xxxx]——属性选择器和 class
+   同权重，只用一两个 class 覆盖不稳（见 ArticleIndexList.vue 同一处注释）。 */
+.lk-proj-side__sticky .lk-ai-asst.lk-proj-side__assistant {
+  min-height: 350px;
+}
+
 /* ── 卡片壳：Notion/GitHub 左侧控制区风格 ── */
 .lk-proj-side__shell {
   display: flex;

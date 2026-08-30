@@ -265,6 +265,17 @@ function formatDate(value) {
   gap: 0.75rem;
 }
 
+/* AI 卡片自己的固定高度，不再靠父级 stretch 撑出来（见上面 __content 的注释）。
+   取两页满员（各 4 篇）实测高度的平均值（≈928px）减去搜索卡实测高度，让常见情况
+   下两栏底边大致齐平，同时保持是个写死的数字——不随当前这页文章多少而变。
+   选择器要凑够 3 个 class：AiAssistantWidget 自己 <style scoped> 里的
+   .lk-ai-asst 规则会被 Vue 编译成 .lk-ai-asst[data-v-xxxx]，属性选择器
+   和 class 权重相同，specificity 是 (0,2,0)——只写 .lk-article-three__assistant
+   (0,1,0) 覆盖不掉它，写两个 class 又跟它打平、谁赢看打包后的先后顺序、不可靠。 */
+.lk-article-three__left .lk-ai-asst.lk-article-three__assistant {
+  min-height: 420px;
+}
+
 .lk-article-three__middle {
   min-width: 0;
   width: 100%;
