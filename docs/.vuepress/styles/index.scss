@@ -4091,6 +4091,7 @@ html[data-lk-route^='/tech/']:not([data-lk-route='/tech']) {
 
 /* 文章 / 项目详情（page-article-post）：标题 / 此页内容 / 正文白卡共用同一内容栏宽度 */
 @mixin lk-article-post-surface-align($root: '#{$root}') {
+  #{$root} .page-cover,
   #{$root} .vp-page-title,
   #{$root} .vp-toc-placeholder,
   #{$root} [vp-content]:not(.custom),
@@ -4297,6 +4298,7 @@ html[data-lk-route^='/tech/']:not([data-lk-route='/tech']) {
     padding-inline: 0 !important;
   }
 
+  #{$root}:has(aside.vp-sidebar) .page-cover,
   #{$root}:has(aside.vp-sidebar) .vp-page-title,
   #{$root}:has(aside.vp-sidebar) [vp-content]:not(.custom),
   #{$root}:has(aside.vp-sidebar) .vp-page-nav {

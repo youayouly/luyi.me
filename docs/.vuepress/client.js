@@ -1575,6 +1575,21 @@ const ARTICLE_SIDEBAR_FOOTER_SELECTOR = 'footer.lk-footer'
 const ARTICLE_TOC_STALE_EVICT_ATTEMPT = 8
 const ARTICLE_TOC_VERIFY_ROUNDS = 6
 
+/*
+ * scheduleArticleTocDock / verifyArticleTocDock 都是 32ms~120ms 一轮的递归 setTimeout 链，
+ * 挂在同一份共享 DOM（.lk-article-toc-dock / .vp-toc-placeholder）上。快速连续切换侧栏文章
+ * （在上一条链还没跑完的 ~2.5s 内点下一条）会同时存在两条针对不同 path 的链，后一条把节点
+ * 搬走/清空的同时前一条还在读旧状态判断，互相打架，最坏情况是「此页内容」被两条链轮流
+ * undock 成 null 之后再也没人把它 dock 回来。用一个随路由单调递增的世代号堵住这个口子：
+ * 每次路由变化前 bump 一次，链在每一轮递归前核对世代号，一旦对不上说明有更新的导航已经
+ * 发生，直接放弃，不再触碰 DOM——让那条新导航自己发起的链去收尾。 */
+let articleTocGeneration = 0
+
+function bumpArticleTocGeneration() {
+  articleTocGeneration += 1
+  return articleTocGeneration
+}
+
 let mobileTocToolbarSidebarHome = null
 
 function getPortfolioNavLabel(path) {
@@ -2444,28 +2459,34 @@ function syncArticleTocDock(path, { evictStale = false } = {}) {
  * MAIN.vp-page 原位另建一份新的，侧栏那份再也不会被 patch。复查时上面的
  * managed/inline 分支会发现这份新的，把旧的丢掉换上来。
  */
-function verifyArticleTocDock(path, round = 0) {
+function verifyArticleTocDock(path, round = 0, gen = null) {
   if (typeof window === 'undefined' || round >= ARTICLE_TOC_VERIFY_ROUNDS) return
+  const myGen = gen ?? articleTocGeneration
+  if (myGen !== articleTocGeneration) return // 有更新的导航已经开始，这条链让位
 
   window.setTimeout(() => {
+    if (myGen !== articleTocGeneration) return
     // 复查阶段 Vue 早已把这一页渲染完，此时还对不上就是真的对不上：允许清掉旧目录。
     syncArticleTocDock(path, { evictStale: true })
-    verifyArticleTocDock(path, round + 1)
+    verifyArticleTocDock(path, round + 1, myGen)
   }, 120 * (round + 1))
 }
 
-function scheduleArticleTocDock(path, attempt = 0) {
+function scheduleArticleTocDock(path, attempt = 0, gen = null) {
   if (typeof window === 'undefined') return
   const resolvedPath = path != null ? normPath(path) : normPath(window.location.pathname)
+  const myGen = gen ?? articleTocGeneration
+  if (myGen !== articleTocGeneration) return // 有更新的导航已经开始，这条链让位
 
   if (syncArticleTocDock(resolvedPath, { evictStale: attempt >= ARTICLE_TOC_STALE_EVICT_ATTEMPT })) {
-    verifyArticleTocDock(resolvedPath)
+    verifyArticleTocDock(resolvedPath, 0, myGen)
     return
   }
 
   if (attempt < 80) {
     window.setTimeout(() => {
-      scheduleArticleTocDock(resolvedPath, attempt + 1)
+      if (myGen !== articleTocGeneration) return
+      scheduleArticleTocDock(resolvedPath, attempt + 1, myGen)
     }, 32)
   }
 }
@@ -2782,6 +2803,9 @@ export default defineClientConfig({
     app.component('ProjectsRolesCard', ProjectsRolesCard)
     app.component('SiteAvatar', SiteAvatar)
     router.beforeEach((to) => {
+      // 每次导航先让上一条 TOC dock/verify 链失效，防止快速连点侧栏文章时两条链
+      // 同时改同一份 DOM 打架，把「此页内容」卡在被清空的状态。
+      bumpArticleTocGeneration()
       if (!canAccessPath(to.path)) {
         return { path: '/', replace: true }
       }
