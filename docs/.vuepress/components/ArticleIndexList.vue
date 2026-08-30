@@ -218,7 +218,6 @@ function formatDate(value) {
   --lk-article-gap: 2rem;
   /* 顶距减为原先 (navbar+0.9rem) 的约 1/3；sticky 单独用安全值避免吸顶时压导航 */
   --lk-article-content-pad-top: calc((var(--navbar-height, 3.6rem) + 0.9rem) / 3);
-  --lk-article-sticky-top: calc(var(--navbar-height, 3.6rem) + 0.35rem);
   /* 与 Projects hub 对齐：max-width 1200；父级为 flex+align-items:center 时勿用 width:100% 撑满整行 */
   width: min(100%, 1200px);
   max-width: 1200px;
@@ -241,14 +240,15 @@ function formatDate(value) {
   grid-template-columns: var(--lk-article-side-w) minmax(0, 1fr);
   gap: var(--lk-article-gap);
   /*
-   * start，不是 stretch：跟 about / guestbook 不同，中间这栏是分页的——
-   * 切换第 1/2/3 页时文章数量（4/4/2）和每张卡的摘要行数都在变，右栏的
-   * 实际高度每次都不一样。stretch 会让侧栏（含 AiAssistantWidget，它自己
-   * height:100% 跟随父级）在每次翻页时都重新拉伸/收缩去匹配，看起来像
-   * 卡片在来回抽动。改成 start 让两栏各自按自身内容定高，AI 卡就固定在
-   * 组件自己的 min-height，不再跟着当页文章数量变化。
+   * stretch，不是 start：跟 about/guestbook 同一套取舍。中列（分页文章卡）
+   * 换页时高度会变，stretch 会让侧栏（含 AiAssistantWidget，靠 flex:1 1 auto
+   * 填满剩余高度）跟着重新拉伸/收缩——早先为了避免这点改成过 start + 写死
+   * px 高度、又改成过 100vh 封顶 + 内部滚动条，但前者只在某一种缩放/当页
+   * 篇数下凑得上，后者会在内容超出视口时把 AI 卡片挤到滚动条下面看不见
+   * （都是用户反馈翻出来的）。翻页时 AI 卡跟着长高一点、也不再吸顶滚动，
+   * 好过两栏对不齐或者内容被滚动条吞掉。
    */
-  align-items: start;
+  align-items: stretch;
   /* 整组（搜索栏 + 文章列表）作为一块在容器中居中 */
   justify-content: center;
   width: 100%;
@@ -257,40 +257,25 @@ function formatDate(value) {
   padding-top: var(--lk-article-content-pad-top);
 }
 
-/* max-height 卡在视口高度而不是中列（分页文章卡）的实际高度：中列每页篇数
- * 和每张摘要行数都在变，靠一个写死的 px 去凑「两栏底边齐平」只在某一种
- * 缩放/分辨率/当页篇数下凑得上，换一种就露出大缺口或溢出（浏览器缩放调到
- * 110%/50%都能看见）。改成让 sticky 容器自己封顶在视口高度，超出部分内部
- * 滚动；容器内部再用 flex 让最后一张卡（AI 问答）吃掉搜索卡之外的剩余高度。
- * 视口高度随缩放同步变化，任何缩放级别下侧栏都能撑到视口底部附近。 */
+/* 不再 position:sticky——跟 .lk-article-three__content 的注释同一个取舍：
+ * 这一栏是 grid item，父级已 align-items:stretch，flex:1 1 auto 把高度
+ * 透传给最后一张卡（AI 问答），任何缩放/任何一页文章数量下都跟中列严丝
+ * 合缝，不需要 max-height 封顶也不需要内部滚动条。 */
 .lk-article-three__left {
-  position: sticky;
-  top: var(--lk-article-sticky-top);
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.75rem;
-  /* flex-grow 只在容器有「多出来的空间」可分时才起作用，光设 max-height（上限）
-     不会让容器主动长到那么高；改用 height 给它一个确定的目标高度，AI 卡片才有
-     东西可以 flex:1 1 auto 去吃。搜索卡本身内容碰巧比这个高度还高时，
-     overflow-y:auto 兜底内部滚动，不强行压扁搜索卡。 */
-  height: calc(100vh - var(--lk-article-sticky-top) - 1.5rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  min-height: 0;
 }
 
-.lk-article-three__left::-webkit-scrollbar {
-  display: none;
-}
-
-/* 最后一张卡（AI 问答）吃掉 sticky 容器里搜索卡之外的剩余高度：选择器要凑够
-   3 个 class，AiAssistantWidget 自己 <style scoped> 里的 .lk-ai-asst 规则
-   会被 Vue 编译成 .lk-ai-asst[data-v-xxxx]，属性选择器和 class 权重相同，
-   specificity 是 (0,2,0)——只写 .lk-article-three__assistant (0,1,0) 覆盖
-   不掉它，写两个 class 又跟它打平、谁赢看打包后的先后顺序、不可靠。 */
+/* 最后一张卡（AI 问答）吃掉搜索卡之外的剩余高度：选择器要凑够 3 个 class，
+   AiAssistantWidget 自己 <style scoped> 里的 .lk-ai-asst 规则会被 Vue 编译
+   成 .lk-ai-asst[data-v-xxxx]，属性选择器和 class 权重相同，specificity
+   是 (0,2,0)——只写 .lk-article-three__assistant (0,1,0) 覆盖不掉它，写两个
+   class 又跟它打平、谁赢看打包后的先后顺序、不可靠。 */
 .lk-article-three__left .lk-ai-asst.lk-article-three__assistant {
   flex: 1 1 auto;
-  min-height: 0;
 }
 
 .lk-article-three__middle {
@@ -684,13 +669,8 @@ function formatDate(value) {
     grid-template-columns: 1fr;
   }
 
-  .lk-article-three__left {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  /* 移动端：搜索卡置于最上方，文章列表在下 */
+  /* 移动端：单列 grid 下每栏各占一行，stretch 无从对齐，flex:1 1 auto 也就
+     没有多余空间可吃，天然按自身内容定高——搜索卡置于最上方，文章列表在下 */
   .lk-article-three__left {
     order: 1;
   }

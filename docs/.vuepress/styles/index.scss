@@ -2409,12 +2409,13 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
   grid-template-columns: var(--lk-proj-portfolio-w) minmax(0, 1fr);
   row-gap: 14px;
   column-gap: var(--lk-proj-col-gap);
-  /* start，不是 stretch：main 列（ProjectCardsGrid）是分页的，翻页时每页项目
-     数量和卡片高度都不一样。stretch 会让左列（含 AiAssistantWidget，靠
-     flex:1 1 auto 填满剩余高度）跟着每次翻页重新拉伸/收缩，AI 卡片看起来
-     像在来回抽动——跟 article 列表页同一个坑，处理方式也一样：改成 start，
-     两列各自按自身内容定高。 */
-  align-items: start;
+  /* stretch，不是 start：跟 about/guestbook 同一套取舍。main 列
+     （ProjectCardsGrid）分页，换页时高度会变，stretch 会让左列（含
+     AiAssistantWidget，靠 flex:1 1 auto 填满剩余高度）跟着重新拉伸/收缩——
+     早先为了避免这点改成过 start + 写死 px 高度，但那样两栏底边只在某一种
+     缩放/当页卡片数下凑得上，换个缩放或翻页就露出大缺口（见 CLAUDE.md/用户
+     反馈）。翻页时 AI 卡跟着长高一点，好过两栏永远对不齐。 */
+  align-items: stretch;
   width: 100%;
   margin: 0 auto;
   flex: none;
@@ -2586,13 +2587,9 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
     order: 2;
   }
 
-  /* 单列布局：portfolio 不需要拉伸，sticky 卡片也改 static 避免「空悬」 */
+  /* 单列布局：portfolio 不需要拉伸，各栏按自身内容定高 */
   .lk-proj-hub-layout__portfolio {
     align-self: auto;
-  }
-  .lk-proj-hub-layout__portfolio .lk-proj-side__sticky {
-    position: static;
-    max-height: none;
   }
 
   .lk-proj-hub-layout__roles {
@@ -8265,11 +8262,6 @@ html {
     align-self: auto !important;
   }
 
-  .lk-proj-hub-layout__portfolio .lk-proj-side__sticky {
-    position: static !important;
-    max-height: none !important;
-  }
-
   .lk-proj-hub-layout__main {
     order: 2 !important;
     height: auto !important;
@@ -8298,9 +8290,6 @@ html {
   }
 
   .lk-article-three__left {
-    position: static !important;
-    max-height: none !important;
-    overflow-y: visible !important;
     order: 1;
   }
 
