@@ -471,9 +471,12 @@ watch(currentBackground, () => {
             <div class="about-right">
               <div class="about-card about-card--intro">
                 <h2>简介</h2>
-                <p class="about-role-line">关注产品、技术和跨文化体验。</p>
+                <p class="about-role-line">
+                  关注产品、技术和跨文化体验，喜欢从不同视角比较新加坡和国内的生活方式、教育体系与工作节奏。
+                </p>
                 <p class="about-bio">
-                  我喜欢把复杂信息整理成更清晰的结构，也持续在嵌入式、前端和 AI 工具方向做项目实践。
+                  我喜欢把复杂信息整理成更清晰的结构，这个习惯从写文档延伸到写代码——目前在新加坡国立大学（NUS）攻读硕士学位，
+                  日常往返新加坡和中国内地，也在嵌入式、前端和 AI 工具方向持续做项目实践，把踩过的坑整理成博客里的文章。
                 </p>
                 <div class="about-tags-strip" aria-label="技能与兴趣">
                   <div class="about-tags about-tags--tech">

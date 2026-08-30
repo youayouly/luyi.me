@@ -55,7 +55,7 @@ const REACT_KEY = 'lk:gb:react'
  * 放开任意字符串等于给了一个可以写任意 key、也可能塞进 DOM 的口子。
  */
 const REACTIONS = ['👍', '🎉', '🤝', '😂']
-/** 一台设备对一条留言只能点一次，锁留半年。 */
+/** 一台设备对一条留言的同一个表情最多同时算一次；取消后锁清掉，可以重新点。锁本身留半年。 */
 const REACT_LOCK_TTL_SEC = 180 * 24 * 60 * 60
 /** 验证码有效期 10 分钟，够去邮箱翻一趟。 */
 const CODE_TTL_SEC = 10 * 60
@@ -421,6 +421,35 @@ module.exports = async function handler(req, res) {
       }
 
       const count = await kvCmd('HINCRBY', REACT_KEY, `${id}:${emoji}`, 1)
+      return res.status(200).json({ ok: true, id, emoji, count: Number(count) })
+    }
+
+    /* ── 取消表情回应 ───────────────────────────────────────── */
+    if (body.action === 'unreact') {
+      const id = String(body.id || '')
+      const emoji = String(body.emoji || '')
+      if (!REACTIONS.includes(emoji)) {
+        return res.status(400).json({ ok: false, error: '不支持这个表情' })
+      }
+      if (parsed.bot) return res.status(200).json({ ok: true, skipped: 'bot' })
+
+      const vid = crypto
+        .createHash('sha256')
+        .update(`${ip}|${ua}`)
+        .digest('hex')
+        .slice(0, 16)
+
+      /* 锁不存在说明这台设备本来就没点过这个表情，没什么好撤的。 */
+      const lockKey = `lk:gb:rx:${vid}:${id}:${emoji}`
+      const removed = await kvCmd('DEL', lockKey)
+      if (!removed) return res.status(200).json({ ok: true, skipped: 'not-reacted' })
+
+      const count = await kvCmd('HINCRBY', REACT_KEY, `${id}:${emoji}`, -1)
+      /* 正常不会到负数，但别的设备的取消请求可能并发撞上，夹一下保险。 */
+      if (Number(count) < 0) {
+        await kvCmd('HSET', REACT_KEY, `${id}:${emoji}`, 0)
+        return res.status(200).json({ ok: true, id, emoji, count: 0 })
+      }
       return res.status(200).json({ ok: true, id, emoji, count: Number(count) })
     }
 

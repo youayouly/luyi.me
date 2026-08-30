@@ -2,6 +2,8 @@
 title: AI Key 路由：SiliconFlow、DeepSeek、Qwen、One API、ZCode 和 CCSwitch
 description: 把模型供应商 Key、One API 中转平台和 Claude Code 适配工具串成一套可维护的 AI 开发调用链。
 date: 2026-04-22T05:38:00.000Z
+cover: /gallery/home-rec-ai-key-router.png
+tags: [AI, Infra, Workflow]
 pageClass: page-article-post
 comment: false
 toc: true

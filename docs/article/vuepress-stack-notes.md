@@ -2,6 +2,8 @@
 title: 用 VuePress 2 搭静态个人站
 description: 短文记录本站选型与目录约定。
 date: 2026-04-02
+cover: /gallery/article-soft-vuepress-stack.png
+tags: [VuePress, Frontend]
 pageClass: page-article-post
 comment: false
 toc: true

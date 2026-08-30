@@ -2,6 +2,8 @@
 title: OpenClaw 本地搭建
 description: 在本地用 Python 虚拟环境 + LangChain 跑通第一条大模型调用，方便后续接 Agent 和 MCP。
 date: 2026-04-22T04:00:59.216Z
+cover: /gallery/article-soft-openclaw.png
+tags: [AI, Local]
 pageClass: page-article-post
 comment: false
 toc: true

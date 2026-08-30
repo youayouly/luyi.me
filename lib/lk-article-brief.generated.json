@@ -1,0 +1,95 @@
+[
+  {
+    "title": "AI Key 路由：SiliconFlow、DeepSeek、Qwen、One API、ZCode 和 CCSwitch",
+    "excerpt": "把模型供应商 Key、One API 中转平台和 Claude Code 适配工具串成一套可维护的 AI 开发调用链。",
+    "tags": [
+      "AI",
+      "Infra",
+      "Workflow"
+    ],
+    "href": "/article/ai-key-router-one-api-zcode-ccswitch.html"
+  },
+  {
+    "title": "AI 提示词模板",
+    "excerpt": "可复用的调试 / 开发提问结构，减少来回追问，让 AI 输出更可验证。",
+    "tags": [
+      "Prompt",
+      "Workflow"
+    ],
+    "href": "/article/ai模板.html"
+  },
+  {
+    "title": "Edge AI 部署流水线的几笔记录",
+    "excerpt": "设备端推理前的最小检查清单草稿。",
+    "tags": [
+      "Embedded",
+      "ML"
+    ],
+    "href": "/article/edge-ai-sketch.html"
+  },
+  {
+    "title": "Git 发布流水线：从本地改动到 Vercel Release",
+    "excerpt": "把暂存、提交、同步、推送、部署和排错拆成稳定模块，记录图片、批量发布和 Vercel Release 踩过的坑。",
+    "tags": [
+      "Pinned",
+      "Git",
+      "Release"
+    ],
+    "href": "/article/git-release-map.html"
+  },
+  {
+    "title": "AI 基础设施笔记",
+    "excerpt": "Agent、MCP、Dify/Coze 与外部工具——把大模型从「能聊天」推到「能干活」时需要哪些零件。",
+    "tags": [
+      "Agent",
+      "Infra"
+    ],
+    "href": "/article/langchain.html"
+  },
+  {
+    "title": "OpenClaw 本地搭建",
+    "excerpt": "在本地用 Python 虚拟环境 + LangChain 跑通第一条大模型调用，方便后续接 Agent 和 MCP。",
+    "tags": [
+      "AI",
+      "Local"
+    ],
+    "href": "/article/openclaw.html"
+  },
+  {
+    "title": "产品经理作品集改造 PRD：把博客变成求职入口",
+    "excerpt": "从招聘方视角重构个人站，把技术博客、案例文章和简历信息整理成产品经理作品集。",
+    "tags": [
+      "PM",
+      "Portfolio",
+      "PRD"
+    ],
+    "href": "/article/pm-portfolio-prd.html"
+  },
+  {
+    "title": "Projects 作品集分页：把岗位、项目和文章串成招聘入口",
+    "excerpt": "记录这次把 PM 作品集前置、项目按岗位分页、文章列表分页，以及用 SiliconFlow 星系图做本地背景的迭代。",
+    "tags": [
+      "PM",
+      "Projects",
+      "Portfolio"
+    ],
+    "href": "/article/pm-projects-pagination-galaxy.html"
+  },
+  {
+    "title": "用 VuePress 2 搭静态个人站",
+    "excerpt": "短文记录本站选型与目录约定。",
+    "tags": [
+      "VuePress",
+      "Frontend"
+    ],
+    "href": "/article/vuepress-stack-notes.html"
+  },
+  {
+    "title": "Personal Blog：Projects 文档",
+    "excerpt": "本站技术栏与组件地图的完整说明，归类在 Projects 分区，列表里一并收录便于检索。",
+    "tags": [
+      "Meta"
+    ],
+    "href": "/tech/my-blog.html"
+  }
+]

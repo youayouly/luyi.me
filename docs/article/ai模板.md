@@ -2,6 +2,8 @@
 title: AI 提示词模板
 description: 可复用的调试 / 开发提问结构，减少来回追问，让 AI 输出更可验证。
 date: 2026-04-22T04:01:02.375Z
+cover: /gallery/article-soft-prompt-templates.png
+tags: [Prompt, Workflow]
 pageClass: page-article-post
 comment: false
 toc: true

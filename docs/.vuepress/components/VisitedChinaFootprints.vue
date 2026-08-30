@@ -1739,6 +1739,7 @@ onUnmounted(() => {
   margin-top: 0.65rem;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.85rem;
   font-size: 0.82rem;
@@ -1750,15 +1751,8 @@ onUnmounted(() => {
 }
 
 .lk-cnfp__legend-item--hint {
-  margin-left: auto;
   font-weight: 600;
   opacity: 0.9;
-}
-
-@media (max-width: 720px) {
-  .lk-cnfp__legend-item--hint {
-    margin-left: 0;
-  }
 }
 
 @keyframes lk-cnfp-ripple {

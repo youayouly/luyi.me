@@ -45,6 +45,8 @@
           </div>
         </div>
       </div>
+
+      <AiAssistantWidget class="lk-proj-side__assistant" />
     </div>
   </section>
 </template>
@@ -57,6 +59,7 @@ import { useProjectsHub, syncHubRoleFromRoute } from '../composables/useProjects
 import { formatRelativeTime } from '../utils/relativeTimeZh.js'
 import { pageLang } from '../utils/pageTranslate.js'
 import { SOURCE_LANG } from '../utils/translatePref.js'
+import AiAssistantWidget from './AiAssistantWidget.vue'
 
 /** 职位 pill：仅英文（与 URL id 一致） */
 const ROLE_PILL_LABELS = {
@@ -116,28 +119,30 @@ watch(
 </script>
 
 <style scoped>
-/* ── Section wrapper：stretch 到 portfolio 高度让 sticky 有空间运行 ── */
+/* ── Section wrapper ── */
 .lk-proj-side {
+  display: flex;
+  flex-direction: column;
   margin-top: 0.35rem;
   width: 100%;
-  flex: 1 1 auto;
-  align-self: stretch;
   min-height: 0;
 }
 
-/* ── Sticky container：position sticky + max-height 滚动 ── */
+/* ── Sticky container：position sticky + max-height 滚动 ──
+   不再跟 main 列（分页的 ProjectCardsGrid）做高度匹配——见 index.scss 里
+   .lk-proj-hub-layout 的注释：main 每页项目数量不同，stretch 会让下面的
+   AiAssistantWidget（它自己 height:100% 跟随父级）跟着每次翻页重新拉伸，
+   看起来像在抽动。现在整条链路都按自身内容定高，AI 卡片固定在组件自己的
+   min-height，不再依赖父级传下来的「撑满行高」信号。 */
 .lk-proj-side__sticky {
   position: sticky;
   top: calc(var(--navbar-height, 3.5rem) + 1.25rem);
-  max-height: calc(100vh - var(--navbar-height, 3.5rem) - 2rem);
-  overflow-y: auto;
-  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
   z-index: 4;
   width: 100%;
-  /* 隐藏滚动条但保留滚动能力 */
-  scrollbar-width: none;
 }
-.lk-proj-side__sticky::-webkit-scrollbar { display: none; }
 
 /* ── 卡片壳：Notion/GitHub 左侧控制区风格 ── */
 .lk-proj-side__shell {

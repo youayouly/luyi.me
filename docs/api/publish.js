@@ -6,6 +6,7 @@
 
 const fs = require('fs')
 const path = require('path')
+const { guessTags, yamlString } = require('../lib/lk-article-tags.js')
 
 const ALLOWED_TARGETS = {
   article: 'docs/article',
@@ -303,10 +304,15 @@ module.exports = async function handler(req, res) {
     // 1. 创建/更新文章文件
     let articleSha = await getFileSha(GITHUB_TOKEN, GITHUB_REPO, filePath, GITHUB_BRANCH)
 
-    // 添加 frontmatter
+    // 添加 frontmatter——title/date 之外把 description/cover/tags 也落盘，
+    // 不然 scripts/sync-article-index.mjs 读不到这几项，文章列表/首页推荐/
+    // 关于我页「最近写过的」这三处自动生成就都跟这篇文章脱节了。
     const articleContent = `---
-title: ${title}
+title: ${yamlString(title)}
+description: ${yamlString(excerpt)}
 date: ${dateStr}
+cover: ${yamlString(safeCover)}
+tags: [${guessTags(title, excerpt).map((t) => yamlString(t)).join(', ')}]
 ---
 
 ${content}`

@@ -5,6 +5,7 @@
 
 const fs = require('fs')
 const path = require('path')
+const { guessTags, yamlString } = require('../lib/lk-article-tags.js')
 
 const ALLOWED_TARGETS = {
   article: 'docs/article',
@@ -288,73 +289,6 @@ function countExistingItems(content) {
   return matches ? matches.length : 0
 }
 
-function escapeJsString(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/\r?\n/g, ' ')
-}
-
-function guessTags(title, excerpt) {
-  const text = `${title} ${excerpt}`.toLowerCase()
-  if (text.includes('agent') || text.includes('mcp') || text.includes('infra')) return ['Agent', 'Infra']
-  if (text.includes('prompt') || text.includes('模板')) return ['Prompt', 'Workflow']
-  if (text.includes('openclaw') || text.includes('langchain') || text.includes('大模型')) return ['AI', 'Local']
-  return ['Article']
-}
-
-function removeObjectByMarker(content, marker) {
-  const markerIndex = content.indexOf(marker)
-  if (markerIndex === -1) return content
-
-  const start = content.lastIndexOf('\n  {', markerIndex)
-  if (start === -1) return content
-
-  let end = content.indexOf('\n  },', markerIndex)
-  let trailingLength = 5
-  if (end === -1) {
-    end = content.indexOf('\n  }', markerIndex)
-    trailingLength = 4
-  }
-  if (end === -1) return content
-
-  return content.slice(0, start) + content.slice(end + trailingLength)
-}
-
-function generateArticleIndexObject(item) {
-  const tags = guessTags(item.title, item.excerpt).map(tag => `'${escapeJsString(tag)}'`).join(', ')
-  return `  {
-    slug: '${escapeJsString(item.slug)}',
-    href: '/article/${escapeJsString(item.slug)}.html',
-    cover: '${escapeJsString(item.cover)}',
-    date: '${escapeJsString(item.date)}',
-    title: '${escapeJsString(item.title)}',
-    excerpt: '${escapeJsString(item.excerpt)}',
-    tags: [${tags}],
-  },`
-}
-
-function updateArticleIndexList(content, items) {
-  const marker = 'const articles = [\n'
-  if (!content.includes(marker)) return null
-
-  let next = content
-  for (const item of items) {
-    next = removeObjectByMarker(next, `slug: '${item.slug}'`)
-  }
-
-  const insertion = items.map(generateArticleIndexObject).join('\n')
-  return next.replace(marker, `${marker}${insertion}\n`)
-}
-
-function readSourceFile(token, repo, branch, filePath) {
-  if (isLocalDev()) {
-    const local = readLocal(filePath)
-    if (local !== null) return Promise.resolve(local)
-  }
-  return getFileContent(token, repo, filePath, branch)
-}
-
 function isLocalDev() {
   return process.env.VERCEL_ENV === undefined || process.env.VERCEL_ENV === 'development'
 }
@@ -461,9 +395,14 @@ module.exports = async function handler(req, res) {
       // 使用标准 ISO 格式：YYYY-MM-DDTHH:mm:ss+08:00
       const dateStr = now.toISOString()
 
+      // title/date 之外把 description/cover/tags 也落盘，理由同 publish.js：
+      // scripts/sync-article-index.mjs 靠这几项生成文章列表/首页推荐/关于我页。
       const articleContent = `---
-title: ${title}
+title: ${yamlString(title)}
+description: ${yamlString(excerpt || '')}
 date: ${dateStr}
+cover: ${yamlString(safeCover)}
+tags: [${guessTags(title, excerpt || '').map((t) => yamlString(t)).join(', ')}]
 ---
 
 ${content}`
@@ -528,23 +467,10 @@ ${content}`
       }
     }
 
-    if (articleItems.length > 0) {
-      const articleIndexPath = 'docs/.vuepress/components/ArticleIndexList.vue'
-      const articleIndexContent = await readSourceFile(GITHUB_TOKEN, GITHUB_REPO, GITHUB_BRANCH, articleIndexPath)
-      if (articleIndexContent) {
-        const updatedIndex = updateArticleIndexList(articleIndexContent, articleItems)
-        if (updatedIndex && updatedIndex !== articleIndexContent) {
-          files.push({
-            path: articleIndexPath,
-            content: updatedIndex,
-          })
-          if (isLocalDev()) {
-            saveToLocal(articleIndexPath, updatedIndex)
-          }
-          console.log(`[Publish-Batch] 准备更新 ArticleIndexList，新增 ${articleItems.length} 篇文章`)
-        }
-      }
-    }
+    // ArticleIndexList.vue 不再是一份手写数组，改成 import 生成文件了（见
+    // scripts/sync-article-index.mjs），所以这里不用再往它里面注入文章条目——
+    // 那份数据现在跟着 docs/article/*.md 的 frontmatter 走，下次跑 build（或
+    // 单独跑 npm run sync:articles）就会自动包含刚发布的这篇。
 
     // 一次性提交所有文件
     console.log(`[Publish-Batch] 开始提交 ${files.length} 个文件...`)

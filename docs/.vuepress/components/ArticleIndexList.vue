@@ -1,8 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { articles } from '../data/articleIndex.generated.js'
+import AiAssistantWidget from './AiAssistantWidget.vue'
 
-const pageSize = 5
+const pageSize = 4
 const currentPage = ref(1)
 /** null = 全部文章 */
 const selectedTag = ref(null)
@@ -12,101 +14,6 @@ function articleTime(article) {
   const t = new Date(article.date).getTime()
   return Number.isNaN(t) ? 0 : t
 }
-
-const articles = [
-  {
-    slug: 'pm-projects-pagination-galaxy',
-    href: '/article/pm-projects-pagination-galaxy.html',
-    cover: '/gallery/home-rec-projects-pagination.png',
-    date: '2026-04-22T07:10:00.000Z',
-    title: 'Projects 作品集分页：把岗位、项目和文章串成招聘入口',
-    excerpt: '记录这次把 PM 作品集前置、项目按岗位分页、文章列表分页，以及用 SiliconFlow 星系图做本地背景的迭代。',
-    tags: ['PM', 'Projects', 'Portfolio'],
-  },
-  {
-    slug: 'ai-key-router-one-api-zcode-ccswitch',
-    href: '/article/ai-key-router-one-api-zcode-ccswitch.html',
-    cover: '/gallery/home-rec-ai-key-router.png',
-    date: '2026-04-22T05:38:00.000Z',
-    title: 'AI Key 路由：SiliconFlow、DeepSeek、Qwen、One API、ZCode 和 CCSwitch',
-    excerpt: '把模型供应商 Key、One API 中转平台和 Claude Code 适配工具串成一套可维护的 AI 开发调用链。',
-    tags: ['AI', 'Infra', 'Workflow'],
-  },
-  {
-    slug: 'pm-portfolio-prd',
-    href: '/article/pm-portfolio-prd.html',
-    cover: '/gallery/home-rec-portfolio-prd.png',
-    date: '2026-04-22T05:35:00.000Z',
-    title: '产品经理作品集改造 PRD：把博客变成求职入口',
-    excerpt: '从招聘方视角重构个人站，把技术博客、案例文章和简历信息整理成产品经理作品集。',
-    tags: ['PM', 'Portfolio', 'PRD'],
-  },
-  {
-    slug: 'openclaw',
-    href: '/article/openclaw.html',
-    cover: '/gallery/article-soft-openclaw.png',
-    date: '2026-04-22T04:00:59.216Z',
-    title: 'OpenClaw 本地搭建',
-    excerpt: 'Python 虚拟环境 + LangChain + .env，在本地跑通第一条大模型调用。',
-    tags: ['AI', 'Local'],
-  },
-  {
-    slug: 'langchain',
-    href: '/article/langchain.html',
-    cover: '/gallery/article-soft-agent-workflow.png',
-    date: '2026-04-22T04:01:01.517Z',
-    title: 'AI 基础设施笔记',
-    excerpt: 'Agent、MCP、Dify/Coze 与外部工具——把大模型从能聊天推到能干活的分层地图。',
-    tags: ['Agent', 'Infra'],
-  },
-  {
-    slug: 'ai模板',
-    href: '/article/ai模板.html',
-    cover: '/gallery/article-soft-prompt-templates.png',
-    date: '2026-04-22T04:01:02.375Z',
-    title: 'AI 提示词模板',
-    excerpt: '可复用的调试/开发提问结构，让 AI 协作输出更可验证、少来回追问。',
-    tags: ['Prompt', 'Workflow'],
-  },
-  {
-    slug: 'git-release-map',
-    href: '/article/git-release-map.html',
-    cover: '/gallery/home-rec-git-release.png',
-    date: '2026-04-21',
-    title: 'Git 发布流水线：从本地改动到 Vercel Release',
-    excerpt: '把暂存、提交、同步、推送、部署和排错拆成稳定模块，记录图片、批量发布和 Vercel Release 踩过的坑。',
-    tags: ['Pinned', 'Git', 'Release'],
-    pinned: true,
-  },
-  {
-    slug: 'edge-ai-sketch',
-    href: '/article/edge-ai-sketch.html',
-    cover: '/gallery/article-soft-edge-ai.png',
-    date: '2026-04-12 20:53',
-    title: 'Edge AI 部署流水线的几笔记录',
-    excerpt: '从模型导出、量化到设备端推理验证，整理一条最小可走的检查清单，方便以后项目复用。',
-    tags: ['Embedded', 'ML'],
-  },
-  {
-    slug: 'vuepress-stack-notes',
-    href: '/article/vuepress-stack-notes.html',
-    cover: '/gallery/article-soft-vuepress-stack.png',
-    date: '2026-04-02 20:49',
-    title: '用 VuePress 2 搭静态个人站',
-    excerpt: '主题选型、目录约定、Sass 全局样式与少量客户端增强，和 Projects 里的长文互补。',
-    tags: ['VuePress', 'Frontend'],
-  },
-  {
-    slug: 'my-blog',
-    href: '/tech/my-blog.html',
-    cover: '/gallery/article-soft-openclaw.png',
-    date: '2026-03-20 18:30',
-    title: 'Personal Blog：Projects 文档',
-    excerpt: '本站技术栏与组件地图的完整说明，归类在 Projects 分区，列表里一并收录便于检索。',
-    tags: ['Meta'],
-    external: true,
-  },
-]
 
 const sortedArticles = computed(() =>
   [...articles].sort((a, b) => {
@@ -223,9 +130,12 @@ function formatDate(value) {
             </button>
           </div>
         </div>
+
+        <AiAssistantWidget class="lk-article-three__assistant" />
       </aside>
 
       <main class="lk-article-three__middle">
+        <div class="lk-article-three__list-body">
         <ol class="lk-article-three__list">
           <li
             v-for="article in visibleArticles"
@@ -272,29 +182,39 @@ function formatDate(value) {
                 />
               </div>
             </component>
+
+            <!-- 浮动分页：叠在最后一张卡片的封面区上，跟着列表滚动。
+                 是卡片（<a>/RouterLink）的兄弟节点而非其内部子节点——按钮嵌进链接里会
+                 点哪儿都触发跳转。position:absolute 相对这个 li 自身定位，跟随它的
+                 实际高度居中，不用给卡片高度猜一个固定的负 margin。 -->
+            <nav
+              v-if="totalPages > 1 && article === visibleArticles[visibleArticles.length - 1]"
+              class="lk-article-three__pager"
+              aria-label="Articles pagination"
+            >
+              <button
+                v-for="page in totalPages"
+                :key="page"
+                type="button"
+                class="lk-article-three__pager-button"
+                :class="{ 'is-active': page === currentPage }"
+                :aria-current="page === currentPage ? 'page' : undefined"
+                @click="currentPage = page"
+              >
+                {{ page }}
+              </button>
+            </nav>
           </li>
         </ol>
-
-        <nav class="lk-article-three__pager" aria-label="Articles pagination">
-          <button
-            v-for="page in totalPages"
-            :key="page"
-            type="button"
-            class="lk-article-three__pager-button"
-            :class="{ 'is-active': page === currentPage }"
-            :aria-current="page === currentPage ? 'page' : undefined"
-            @click="currentPage = page"
-          >
-            {{ page }}
-          </button>
-        </nav>
+        </div>
       </main>
     </div>
 </template>
 
 <style>
 .lk-article-three {
-  --lk-article-side-w: 240px;
+  /* 280px：跟 guestbook / tech hub / about 的侧栏宽度看齐，统一四个页面的比例。 */
+  --lk-article-side-w: 280px;
   --lk-article-gap: 2rem;
   /* 顶距减为原先 (navbar+0.9rem) 的约 1/3；sticky 单独用安全值避免吸顶时压导航 */
   --lk-article-content-pad-top: calc((var(--navbar-height, 3.6rem) + 0.9rem) / 3);
@@ -320,6 +240,14 @@ function formatDate(value) {
   display: grid;
   grid-template-columns: var(--lk-article-side-w) minmax(0, 1fr);
   gap: var(--lk-article-gap);
+  /*
+   * start，不是 stretch：跟 about / guestbook 不同，中间这栏是分页的——
+   * 切换第 1/2/3 页时文章数量（4/4/2）和每张卡的摘要行数都在变，右栏的
+   * 实际高度每次都不一样。stretch 会让侧栏（含 AiAssistantWidget，它自己
+   * height:100% 跟随父级）在每次翻页时都重新拉伸/收缩去匹配，看起来像
+   * 卡片在来回抽动。改成 start 让两栏各自按自身内容定高，AI 卡就固定在
+   * 组件自己的 min-height，不再跟着当页文章数量变化。
+   */
   align-items: start;
   /* 整组（搜索栏 + 文章列表）作为一块在容器中居中 */
   justify-content: center;
@@ -332,6 +260,9 @@ function formatDate(value) {
 .lk-article-three__left {
   position: sticky;
   top: var(--lk-article-sticky-top);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .lk-article-three__middle {
@@ -342,6 +273,7 @@ function formatDate(value) {
 }
 
 .lk-article-three__panel {
+  flex: none;
   border: 1px solid rgba(110, 231, 223, 0.18);
   border-radius: 20px;
   padding: 1rem;
@@ -365,26 +297,37 @@ function formatDate(value) {
   font-size: 0.82rem;
 }
 
+.lk-article-three__list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
 .lk-article-three__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 1.1rem;
 }
 
 .lk-article-three__item {
-  margin: 0;
-}
-
-.lk-article-three__card {
-  /* 斜率 = diagonal-frac × 封面列宽；文字区右缘用 --lk-seam-shift 与封面 clip-path 共线 */
+  /* 斜率 = diagonal-frac × 封面列宽；文字区右缘用 --lk-seam-shift 与封面 clip-path 共线。
+     定义在 item 上（而非 card 上）是因为浮动分页跟卡片是兄弟节点，要用同一个封面列宽把
+     自己居中到封面列——变量定义在 card 上时子级看得到、兄弟级看不到。 */
   --lk-diagonal-frac: 0.16;
   --lk-cover-w: 240px;
   --lk-seam-shift: calc(var(--lk-diagonal-frac) * var(--lk-cover-w));
   position: relative;
+  margin: 0;
+}
+
+.lk-article-three__card {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) var(--lk-cover-w);
   overflow: hidden;
   border-radius: 24px;
   text-decoration: none;
@@ -635,18 +578,40 @@ function formatDate(value) {
   font-size: 0.74rem;
 }
 
+/* 分页：贴在最后一张卡片底边、横向居中，横向居中方式跟 ProjectCardsGrid 的分页保持一致
+   （整卡居中，不局限于封面列）。分页是那张卡片（<a>/RouterLink）的兄弟节点，不是子节点——
+   模板里有为什么。position:absolute 相对它俩共同的父级 li 定位，bottom 量的是 li 自己的
+   框，卡片高度变了不用跟着改数字。卡片 hover 时会 translateY(-4px) 上浮，但那是卡片自己的
+   transform、不影响这个绝对定位的兄弟节点——不跟着一起浮，底边间距就会在 hover 时被过滤掉，
+   分页视觉上探出卡片下边缘。所以 hover 态在 li 上再镜像同一个位移，让分页跟卡片同步浮起。 */
 .lk-article-three__pager {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 0.9rem;
+  transform: translateX(-50%);
+  transition: transform 0.2s ease;
   display: flex;
-  justify-content: center;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1.25rem;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
+}
+
+.lk-article-three__item:hover .lk-article-three__pager {
+  transform: translate(-50%, -4px);
 }
 
 .lk-article-three__pager-button {
   min-width: 2.2rem;
   height: 2.2rem;
-  padding: 0 0.75rem;
+  padding: 0 0.55rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   background: rgba(0, 0, 0, 0.22);
@@ -669,16 +634,15 @@ function formatDate(value) {
 
 @media (max-width: 1400px) {
   .lk-article-three {
-    --lk-article-side-w: 220px;
+    --lk-article-side-w: 260px;
   }
 
   .lk-article-three__content {
     /* 跟外层一起收缩，整块仍居中 */
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 260px minmax(0, 1fr);
   }
 
-  .lk-article-three__card {
-    grid-template-columns: minmax(0, 1fr) 220px;
+  .lk-article-three__item {
     --lk-cover-w: 220px;
   }
 }
@@ -694,6 +658,8 @@ function formatDate(value) {
 
   .lk-article-three__left {
     position: static;
+    max-height: none;
+    overflow-y: visible;
   }
 
   /* 移动端：搜索卡置于最上方，文章列表在下 */
@@ -720,6 +686,9 @@ function formatDate(value) {
     -webkit-clip-path: none;
     clip-path: none;
   }
+
+  /* 分页贴的是整个 li 的底边（卡片自己的底边），单列布局下依然成立，不需要再为
+     封面通栏单独算一次偏移量。 */
 }
 
 /* Light mode */

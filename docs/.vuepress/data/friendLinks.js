@@ -13,11 +13,12 @@
  *   - avatar 可选，图片路径；不填则用首字头像
  */
 export const friendLinks = [
-  // {
-  //   id: 'someone',
-  //   name: 'SomeOne',
-  //   desc: '一句话介绍',
-  //   avatar: '/friends/someone.png',
-  //   url: 'https://example.com',
-  // },
+  {
+    id: 'ntkk',
+    name: 'ntkk.net',
+    url: 'https://ntkk.net/login',
+    /* ntkk.net 对跨站直接拉取(hotlink)favicon 有 Referer 校验，非同源请求一律 403，
+       所以这份图标不能像其它友链那样直接引用对方域名，改成下载后自己托管的一份静态拷贝。 */
+    avatar: '/gallery/friend-ntkk-favicon.png',
+  },
 ]

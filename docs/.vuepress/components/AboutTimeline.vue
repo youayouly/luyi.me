@@ -13,7 +13,7 @@ function linkProps(row) {
 }
 
 const rows = computed(() =>
-  [...timelineItems].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10),
+  [...timelineItems].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 20),
 )
 </script>
 

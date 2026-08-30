@@ -1,6 +1,10 @@
 ---
 title: Git 发布流水线：从本地改动到 Vercel Release
+description: 把暂存、提交、同步、推送、部署和排错拆成稳定模块，记录图片、批量发布和 Vercel Release 踩过的坑。
 date: 2026-04-21
+cover: /gallery/home-rec-git-release.png
+tags: [Pinned, Git, Release]
+pinned: true
 pageClass: page-article-post
 toc: true
 ---

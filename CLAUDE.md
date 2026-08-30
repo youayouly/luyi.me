@@ -342,11 +342,20 @@ above are the backstop, not the primary defense.
 
 `/guestbook` (`docs/guestbook.md` → `GuestbookBoard.vue`) plus one endpoint,
 `docs/api/guestbook.js`. **There is no login.** Visitors type a nickname and optionally
-an email or QQ number; the avatar is guessed from whatever they typed —
+an email, QQ number, or GitHub identity; the avatar is guessed from whatever they
+typed (`lib/lk-guest.js#parseContact`) —
 `q1.qlogo.cn` for a QQ number (and for a QQ mailbox, which has a far better hit rate
 than Gravatar), `cravatar.cn` (the China mirror of Gravatar, protocol-identical and not
-blocked) for anything else, nothing at all otherwise, which renders as a lettered
-circle. That means identity is *self-asserted* — the defenses are the rate limits, the
+blocked) for any other email (Gravatar's `d=retro` default means every address gets
+*some* image, real or generated — Gmail is no more trouble than QQ mail here),
+`github.com/<user>.png` for a GitHub profile URL or an `@handle`, nothing at all
+otherwise, which renders as a lettered circle (`initial()`: uppercase first character
+of the nickname, same fixed gradient background for everyone — not randomized). The
+GitHub branch deliberately only matches a link or `@handle`, not a bare username:
+GitHub's username rules are permissive enough that almost any word would match, and a
+bare word previously meant "no avatar" — matching it anyway would turn every such
+input into a request for a (usually nonexistent) avatar image instead. That means
+identity is *self-asserted* — the defenses are the rate limits, the
 length caps, and the owner being able to delete, not authentication. OAuth was
 considered and dropped: QQ Connect needs a business licence, and Google would put
 `accounts.google.com` in front of mainland visitors.
@@ -394,15 +403,49 @@ to it. The labels that only render in a branch (回复态, empty state, per-mess
 buttons) are registered in `scripts/lib/runtime-strings.mjs`, like every other
 runtime-built string.
 
-The page is a single column: composer → 友链 wall → 友链 application → message list.
+The page is **two columns on desktop, stacked on narrow screens** (`.lk-gb` grid, `order`
+flips `.lk-gb-main`/`.lk-gb-rail` visually left/right — see the CSS comment above
+`.lk-gb-page`), not the single column an earlier version of this doc described. Right
+column: composer, then **public** messages. Left column: 友链 wall → 友链 application →
+**private (悄悄话)** messages. The message list is split by `thread.private` into two
+independent `<GuestbookThreadList>` instances (`GuestbookThreadList.vue`, a presentational
+child that emits `react`/`reply`/`remove` back to `GuestbookBoard.vue` and takes the
+helper functions as props) so a visitor scanning public conversation never has to scroll
+past redacted whispers, and the owner's whispers sit together near the friend-link tools
+they're usually about. A reply always renders next to its parent regardless of the
+reply's own privacy flag — splitting is by top-level thread only, replies are never
+pulled into a different column than their parent. Because `<style scoped>` only reaches
+elements in the SFC that declares it, and the thread markup now lives in a child
+component, the `.lk-gb__thread`/`.lk-gb__item`/`.lk-gb__avatar`/etc. CSS moved out of
+`GuestbookBoard.vue`'s scoped block into a second, **unscoped** `<style>` block in the
+same file — global selectors on `lk-`-prefixed classes are safe project-wide by
+convention, and it avoids duplicating that CSS into the child file. Any `:deep(x)` rule
+that moved became a plain `x` selector, since `:deep()` is scoped-CSS-only syntax.
+
 The wall renders `data/friendLinks.js` — the same array the about-page `FriendLinks` card
 uses, so one entry updates both places; only the presentation differs (grid vs. narrow
-list), which is why this page does not import that component. The application card's button
-fills the composer with a template: a friend-link request **is** an ordinary guestbook
+list), which is why this page does not import that component. `avatar` is just an image
+URL, so a friend's own favicon works directly (e.g. `https://<their-domain>/favicon.ico`)
+— no scraping/fetch-metadata pipeline exists to auto-populate `name`/`desc`/`avatar` from
+a URL, entries are hand-written. The application card's button fills the composer with a
+template that **follows `pageLang`** (`fillFriendTemplate()`): English UI gets an English
+template, Chinese gets Chinese — it used to always insert Chinese regardless of site
+language. A friend-link request **is** an ordinary guestbook
 message, so there is no second form, no second endpoint, and no second thing to rate-limit.
 The flow is deliberately "comment first, link second" — the requester does not have to add
 this site before asking; the reply (plus its email notification, if they ticked it) is what
-closes the loop.
+closes the loop. (The card used to also carry an explanatory paragraph above the "use this
+info" block; it was cut as redundant with the heading + the fields themselves.)
+
+The kaomoji picker (`KAOMOJI_CATEGORIES` in `GuestbookBoard.vue`) is a popover, not the
+old flat inline row of 6 buttons: a single 😊 toggle opens a small panel (`position:
+absolute; bottom: 100%`, opens upward because the toolbar sits at the bottom of the
+compose card) with a grid for the active category and a tab strip below it to switch
+categories. Purely client-side, text-only kaomoji (no image sticker packs, no external
+CDN) — `insertFace()` is unchanged, it just appends whichever face was clicked to
+`form.content`. Category names are plain static Chinese text in the template, so they
+ride the normal build-time translation dictionary like any other label; they don't need
+a hand-written zh/en pair the way runtime-injected strings do.
 
 Three later additions, all sharing the same gates:
 
@@ -410,9 +453,12 @@ Three later additions, all sharing the same gates:
   the message row, because a row is one JSON string in a LIST and editing it would mean
   LREM + LPUSH, which reorders the board. The emoji is a **four-item allowlist**: the value
   becomes a Redis field name and lands in the page, so anything else is refused. One device
-  gets one shot per (message, emoji) via `SET NX` on `lk:gb:rx:<vid>:<id>:<emoji>` — the
-  client's `localStorage` only lights the button up. Deleting a message `HDEL`s its fields,
-  or they outlive it as orphans.
+  holds at most one lock per (message, emoji) via `SET NX` on `lk:gb:rx:<vid>:<id>:<emoji>` —
+  the client's `localStorage` only lights the button up; the server lock is what's real.
+  Clicking an already-reacted button sends `action: 'unreact'` instead, which `DEL`s that
+  lock and `HINCRBY`s the field by -1 (clamped to 0 defensively), so a reaction **can be
+  taken back** — it isn't one-shot-forever, just one-at-a-time per device. Deleting a
+  message `HDEL`s its fields, or they outlive it as orphans.
 - **Place badge.** The row stores `country`/`region` from the `x-vercel-ip-*` headers and
   **never the city**; `data/placeNames.js` maps the codes to 「广东」/「新加坡」. It carries
   both languages because this is runtime data that can never reach the build dictionary —
@@ -445,33 +491,69 @@ rather than searching for dangerous substrings — escaped text legitimately con
 - `scripts/sync-article-readme-to-github.mjs` - Syncs README with GitHub
 - `scripts/gen-china-outline.mjs` - Generates China map outline data for `VisitedChinaFootprints`
 - `scripts/sync-external-projects.mjs` / `scripts/onboard-external-project.mjs` - External project sync (see below)
+- `scripts/sync-article-index.mjs` (`npm run sync:articles`, `--check` variant) - Generates `docs/.vuepress/data/articleIndex.generated.js` from `docs/article/*.md` frontmatter; runs automatically before `dev`/`build`. See *Article index* below.
 - `scripts/check-publish.mjs` (`npm run check`) - Diffs local vs `origin/main` article files and counts; use when a publish appears to have half-landed
 
-### Article index: the list is hand-maintained, and publish no longer feeds it
+### Article index: generated from frontmatter, not hand-maintained anymore
 
-This changed and the old wiring is still in the tree as dead code — read this before
-"fixing" a publish that seems not to show up.
+This used to be **three separately hand-maintained lists** that all drifted out of
+sync with each other and with what was actually published: `ArticleIndexList.vue`'s
+inline `const articles = [...]` array, `data/aboutArticleFeed.js`'s
+`recommendedArticles`/`timelineItems`, and three raw `<a href>` bullets hardcoded into
+`AboutMePage.vue`'s "最近写过的" section (which also skipped `RouterLink`, so clicking
+one did a full page reload). Publishing an article wrote `docs/article/<slug>.md` but
+touched none of these, so a freshly published article rendered at its own URL and was
+invisible everywhere else until someone remembered to edit 2–3 files by hand.
 
-`docs/article/README.md` is now 12 lines that render `<ArticleIndexList />`.
-(`docs/article.md` is a near-identical twin; `vercel.json` rewrites `/article` to
-`/article/index.html`, so the README is the one actually served.) **The card list lives
-in a hardcoded `const articles = [...]` array at `ArticleIndexList.vue:16`** — slug,
-href, cover, date, title, excerpt, tags per entry. Publishing an article writes
-`docs/article/<slug>.md` but does **not** add it to that array, so a freshly published
-article renders at its own URL and is invisible on `/article/` until someone edits the
-component.
+**Fixed for two of the three** by making `docs/article/*.md` frontmatter the single
+source of truth. `scripts/sync-article-index.mjs` reads every article's frontmatter
+(`title`, `description` → `excerpt`, `date`, `cover`, `tags`, optional `pinned`) and
+writes `docs/.vuepress/data/articleIndex.generated.js` (`export const articles = [...]`,
+same shape the old inline array had). `ArticleIndexList.vue` and `AboutMePage.vue`'s
+"最近写过的" (now a `v-for` over the 3 most recent, via `RouterLink`) both `import` it —
+neither hardcodes article data anymore. One exception lives outside `docs/article/`:
+`my-blog` → `/tech/my-blog.html` is added from a small `EXTRA_ENTRIES` array in the
+script itself, documented there — not worth widening the scan to all of `docs/`
+for one entry. The script runs before every `dev`/`build` (`package.json`), so the
+generated file is always current at build time even if nobody runs it by hand;
+`npm run sync:articles` / `npm run sync:articles:check` (the latter `--check`s without
+writing) exist for manual runs. `scripts/article.mjs new` also runs it after scaffolding
+a file, and now writes complete frontmatter (`description`/`cover`/`tags` placeholders)
+instead of the two-field `title`/`date` it used to.
 
-Two consequences:
+**`recommendedArticles` in `data/aboutArticleFeed.js` is still hand-maintained on
+purpose** — its cards use dedicated `/gallery/home-rec-*.png` covers and hand-tuned
+excerpts distinct from the article-list ones, not something to auto-overwrite. The sync
+script instead **checks it for drift**: if an entry's `href` no longer resolves to a
+real article, or its inlined `title`/`date` no longer matches that article's frontmatter,
+it prints a warning (not an error — this list still needs a human edit either way).
+`timelineItems` in the same file is a different kind of content entirely — a day-by-day
+digest of *all* work (git commits), not one row per article — and is out of scope for
+this script for the same reason: automating it from git log would produce noise, not
+the "一张卡片、逐行" summary style the entries are meant to have.
 
-- **`publish.js` / `publish-batch.js` still try to inject a `<li class="lk-blog__item">`
-  card into `docs/article/README.md`.** `updateArticleList()` looks for
-  `<ol class="lk-blog__list">`, which that file no longer contains, so it returns `null`
-  and the endpoint reports `listUpdated: false` without erroring. Silent no-op, not a
-  failure to debug.
-- **`ArticleBatchOps.vue` queries `.lk-blog__item[data-slug]`**, but `ArticleIndexList`
-  renders `.lk-article-three__item` / `.lk-article-three__card`. Its selectors match
-  nothing on the current page, so the multi-select delete strip is inert. Retargeting it
-  means changing the selectors in that component, not the markup of the list.
+**`publish.js` / `publish-batch.js` now write full frontmatter**, not just `title`/`date`:
+`description` (from the form's `excerpt` field, already collected but previously
+discarded), `cover` (same story), and `tags` (there's no tag input in the publish UI yet,
+so `lib/lk-article-tags.js#guessTags()` keyword-matches title+excerpt for a rough guess —
+better than no tags, but a real tag field is still a gap). Both now `yamlString()`-quote
+every value instead of interpolating raw strings into the frontmatter block: an
+excerpt containing `: ` or starting with `#`/`[`/`{` used to risk producing invalid YAML
+that could fail to parse. **`publish-batch.js` used to also try to rewrite
+`ArticleIndexList.vue`'s source directly** (`updateArticleIndexList()`, hunting for the
+literal string `const articles = [\n` and splicing in new object literals) — that code
+is gone now that the array doesn't exist in that file anymore; regeneration happens
+through the sync script instead. **`publish.js` / `publish-batch.js` still try to inject
+a `<li class="lk-blog__item">` card into `docs/article/README.md`** (`updateArticleList()`
+looks for `<ol class="lk-blog__list">`, which that file hasn't contained since it became
+12 lines rendering `<ArticleIndexList />`) — this one *is* still dead code, deliberately
+left as-is; it silently no-ops (`listUpdated: false`, no error) rather than crashing.
+
+One remaining consequence of that same stale selector: **`ArticleBatchOps.vue` queries
+`.lk-blog__item[data-slug]`**, but `ArticleIndexList` renders `.lk-article-three__item` /
+`.lk-article-three__card`. Its selectors match nothing on the current page, so the
+multi-select delete strip is inert. Retargeting it means changing the selectors in that
+component, not the markup of the list.
 
 **`__LK_ARTICLE_COUNT__` is not an article count.** `countArticleMarkdown()` in
 `config.js` walks `docs/` recursively and counts every `.md` except `docs/README.md`,
@@ -690,3 +772,46 @@ What the rewrite depends on:
 
 Refits are driven by `scheduleNavFit()` (rAF-coalesced) from: the phone-inline-nav sync, window resize, `TRANSLATE_LANG_EVENT` (label widths change with language), `document.fonts.ready`, a `MutationObserver` on the navbar (`childList` + `characterData` — translation rewrites text in place), and a `ResizeObserver` on `.vp-navbar-start` / `.vp-navbar-end`.
   - Local dev serves `docs/.vuepress/public/` directly, so `/i18n/en.json` works under `npm run dev` too. To point the *fallback* endpoint elsewhere: `localStorage.setItem('lk-translate-api', 'https://<host>/api/translate')`.
+
+### Sidebar + main-content pages: height match, and floating pagers
+
+Four pages share the same shape — a narrower sticky sidebar next to a taller scrolling
+main column — and all four had the same cosmetic problem: the grid used
+`align-items: start`, so the sidebar's own box only ever grew to its content's height,
+even though the *grid area* was already as tall as the main column. Once you scrolled
+past the short sidebar, its column just showed raw page background next to whatever the
+main column was still rendering. Changed all four to `align-items: stretch` and made the
+sidebar's outermost stretched box safe to actually be that tall: `position: sticky` +
+`max-height: calc(100vh - navbar - Nrem)` + `overflow-y: auto`, reset back to
+`position: static; max-height: none` under each page's existing mobile breakpoint (a
+stretched sticky box is meaningless once the layout stacks to one column). Where the
+sidebar is more than one card (`AboutMePage.vue`, `GuestbookBoard.vue`'s left column),
+only the **last** child gets `flex: 1 1 auto` — stretching the invisible flex/grid
+wrapper alone does nothing visually, since it has no background of its own; growing the
+last visible card is what actually fills the gap with real card background instead of
+empty space. `ProjectsSidebarFilters.vue` already had this exact pattern
+(`.lk-proj-side` stretch + `.lk-proj-side__sticky` sticky/max-height/overflow) *before*
+this change, for the same reason — the parent `.lk-proj-hub-layout` was just changed to
+match explicitly rather than relying on the child's `align-self` silently overriding it.
+The four grids: `.lk-gb` (guestbook), `.lk-proj-hub-layout` (tech/projects hub),
+`.lk-article-three__content` (article list), `.lk-aboutme__shell` (about). **The
+homepage (`/`, `AboutPageLayoutV2`) is deliberately excluded** — it wasn't part of this
+pass and its grid (`lk-about-v2-main__grid`, pinned by `vuepress-hope-site.mdc`) has its
+own separate layout rules.
+
+**Pagination** exists on two of those four pages and now looks/behaves the same on both:
+`ProjectCardsGrid.vue` (5 per page — it had no pagination before) and
+`ArticleIndexList.vue` (already 5 per page, `pageSize` in the script). Both wrap their
+card list and a `<nav>` pager in a flex row (`.lk-proj-cards__body` /
+`.lk-article-three__list-body`) so the pager can be `flex: none` while the list is
+`flex: 1 1 auto; min-width: 0`. The pager itself is `position: sticky` inside that row —
+a vertical stack of page-number buttons pinned to the list's top-right edge — not a
+`position: fixed` viewport overlay (that risks overlapping content at viewport widths
+narrower than the `max-width: 1200px` container, where there's little to no side gutter)
+and not `float: right` (float + sticky together is unreliable across browsers). This
+replaces the article pager's old spot directly under the last card, which on a page of
+five full-height article cards could sit far below the fold — the whole point of a
+sticky pager is that changing pages never requires scrolling down to find it. Both pagers
+collapse back to a static, centered, horizontal row at each page's existing mobile
+breakpoint (`max-width: 719px` for projects, the `max-width: 1100px` sidebar-stacking
+breakpoint for articles).

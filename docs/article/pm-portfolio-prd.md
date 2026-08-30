@@ -2,6 +2,8 @@
 title: 产品经理作品集改造 PRD：把博客变成求职入口
 description: 从招聘方视角重构个人站，把技术博客、案例文章和简历信息整理成产品经理作品集。
 date: 2026-04-22T05:35:00.000Z
+cover: /gallery/home-rec-portfolio-prd.png
+tags: [PM, Portfolio, PRD]
 pageClass: page-article-post
 comment: false
 toc: true

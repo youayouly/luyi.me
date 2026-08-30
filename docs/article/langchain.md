@@ -2,6 +2,8 @@
 title: AI 基础设施笔记
 description: Agent、MCP、Dify/Coze 与外部工具——把大模型从「能聊天」推到「能干活」时需要哪些零件。
 date: 2026-04-22T04:01:01.517Z
+cover: /gallery/article-soft-agent-workflow.png
+tags: [Agent, Infra]
 pageClass: page-article-post
 comment: false
 toc: true

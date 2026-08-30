@@ -1,10 +1,25 @@
 <script setup>
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import NoticeCard from './NoticeCard.vue'
 import SiteStatsCard from './SiteStatsCard.vue'
+import AiAssistantWidget from './AiAssistantWidget.vue'
 import VisitedChinaFootprints from './VisitedChinaFootprints.vue'
 import { siteConfig } from '../site.config.js'
+import { articles } from '../data/articleIndex.generated.js'
 
 const author = siteConfig.author
+
+/**
+ * "最近写过的" 曾经是这里手写的 3 个 <a href>，发文章要记得来改，还漏了站内路由跳转
+ * （raw <a> 会整页刷新）。现在从 scripts/sync-article-index.mjs 生成的文章索引里
+ * 按日期取最新 3 篇，发新文章跑一次那个脚本就自动跟上，不用再改这个文件。
+ */
+const recentArticles = computed(() =>
+  [...articles]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 3),
+)
 
 const wechatQrSrc = author.wechatQr
 const wechatId = author.wechatId
@@ -50,36 +65,11 @@ function openWechatPopup() {
           embedded
           class="lk-aboutme__card lk-aboutme__card--stats"
         />
+        <AiAssistantWidget class="lk-aboutme__card lk-aboutme__card--assistant" />
       </aside>
 
       <main class="lk-aboutme__main" aria-label="关于我正文">
         <article class="lk-aboutme__panel">
-          <section class="lk-aboutme__section">
-            <h2 class="lk-aboutme__h2">简介</h2>
-            <ul class="lk-aboutme__bullets">
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">👋</span>
-                <span class="lk-aboutme__text">我是 <strong>{{ author.name }}</strong></span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">🎓</span>
-                <span class="lk-aboutme__text">本科是 <strong>计算机科学</strong></span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">🛠</span>
-                <span class="lk-aboutme__text">兴趣方向：嵌入式开发、前端体验、AI 工具与产品规划</span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">📦</span>
-                <span class="lk-aboutme__text">喜欢把复杂信息整理成更清晰的结构，做项目偏好「能用 + 好看 + 自洽」</span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">💬</span>
-                <span class="lk-aboutme__text">欢迎联系我，不论是聊产品、技术、留学规划，还是新加坡生活都可以。</span>
-              </li>
-            </ul>
-          </section>
-
           <section class="lk-aboutme__section">
             <h2 class="lk-aboutme__h2">正在做与正在学</h2>
             <ul class="lk-aboutme__bullets">
@@ -97,7 +87,7 @@ function openWechatPopup() {
               </li>
               <li>
                 <span class="lk-aboutme__icon" aria-hidden="true">📐</span>
-                <span class="lk-aboutme__text">产品 PRD 与作品集整理（详见 <a href="/article/pm-portfolio-prd.html">PM Portfolio PRD</a>）</span>
+                <span class="lk-aboutme__text">产品 PRD 与作品集整理（详见 <RouterLink to="/article/pm-portfolio-prd.html">PM Portfolio PRD</RouterLink>）</span>
               </li>
             </ul>
           </section>
@@ -105,17 +95,11 @@ function openWechatPopup() {
           <section class="lk-aboutme__section">
             <h2 class="lk-aboutme__h2">最近写过的</h2>
             <ul class="lk-aboutme__bullets">
-              <li>
+              <li v-for="article in recentArticles" :key="article.href">
                 <span class="lk-aboutme__icon" aria-hidden="true">📝</span>
-                <span class="lk-aboutme__text"><a href="/article/pm-projects-pagination-galaxy.html">Projects 作品集分页：把岗位、项目和文章串成招聘入口</a></span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">📝</span>
-                <span class="lk-aboutme__text"><a href="/article/ai-key-router-one-api-zcode-ccswitch.html">AI Key 路由：SiliconFlow / DeepSeek / Qwen / One API / ZCode / CCSwitch</a></span>
-              </li>
-              <li>
-                <span class="lk-aboutme__icon" aria-hidden="true">📝</span>
-                <span class="lk-aboutme__text"><a href="/article/git-release-map.html">Git 发布流水线：从本地改动到 Vercel Release</a></span>
+                <span class="lk-aboutme__text"
+                  ><RouterLink :to="article.href">{{ article.title }}</RouterLink></span
+                >
               </li>
             </ul>
           </section>
@@ -213,14 +197,17 @@ function openWechatPopup() {
             </ul>
           </section>
         </article>
-
-        <div class="lk-aboutme__globe-panel">
-          <section class="lk-aboutme__section">
-            <h2 class="lk-aboutme__h2">去过的地方</h2>
-            <VisitedChinaFootprints />
-          </section>
-        </div>
       </main>
+
+      <!-- 地图独占一整行，横跨侧栏 + 正文两栏——侧栏（含 AI 问答）跟正文的
+           stretch 高度只按「侧栏 vs 正文 panel」算，不会被地图的高度拖长；
+           地图腾出侧栏让出的宽度，跟上面「AI 问答 + 正在做与正在学」合起来同宽。 -->
+      <div class="lk-aboutme__globe-panel">
+        <section class="lk-aboutme__section">
+          <h2 class="lk-aboutme__h2">去过的地方</h2>
+          <VisitedChinaFootprints />
+        </section>
+      </div>
     </div>
   </div>
 </template>

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..')
 const articleDir = path.join(root, 'docs/article')
-const readmePath = path.join(articleDir, 'README.md')
+const generatedIndexPath = path.join(root, 'docs/.vuepress/data/articleIndex.generated.js')
 
 // 颜色输出
 const colors = {
@@ -57,11 +57,12 @@ function getGitTrackedArticles() {
   }
 }
 
-// 获取README中已列出的文章
+// 获取已生成进文章索引的文章——那份数据从 frontmatter 生成，见
+// scripts/sync-article-index.mjs；这里不再读 README（它已经不含文章列表了）。
 function getListedArticles() {
-  if (!fs.existsSync(readmePath)) return []
-  const content = fs.readFileSync(readmePath, 'utf-8')
-  const matches = content.matchAll(/href="\/article\/([a-z0-9-]+)\.html"/g)
+  if (!fs.existsSync(generatedIndexPath)) return []
+  const content = fs.readFileSync(generatedIndexPath, 'utf-8')
+  const matches = content.matchAll(/slug: "([^"]+)"/g)
   return [...new Set([...matches].map(m => m[1]))]
 }
 
@@ -77,9 +78,18 @@ function createArticle(slug, title) {
   const now = new Date()
   const dateStr = now.toISOString().slice(0, 16).replace('T', ' ')
 
+  // description/cover/tags 留了占位——scripts/sync-article-index.mjs 靠这几项
+  // 生成 /article/ 列表、首页推荐和关于我页「最近写过的」，写之前记得填一下，
+  // 尤其是 description（缺了那边只会警告，excerpt 就是空的，不会挡生成）。
   const content = `---
 title: ${title || slug}
+description: TODO 一句话摘要
 date: ${dateStr}
+cover: /gallery/article-cover-1.png
+tags: [TODO]
+pageClass: page-article-post
+comment: false
+toc: true
 ---
 
 # ${title || slug}
@@ -90,58 +100,16 @@ date: ${dateStr}
   fs.writeFileSync(filePath, content, 'utf-8')
   log('green', `✓ 创建文章: ${filePath}`)
 
-  // 更新README列表
-  updateReadmeList(slug, title || slug, dateStr)
-
-  log('green', `✓ 已更新文章列表`)
-  log('blue', `\n提示: 运行 'npm run dev' 预览，满意后运行 'node scripts/article.mjs push' 推送`)
-}
-
-// 更新README列表 - 在第一个li之前插入（时间倒序）
-function updateReadmeList(slug, title, dateStr) {
-  let content = fs.readFileSync(readmePath, 'utf-8')
-
-  // 检查是否已存在
-  if (content.includes(`href="/article/${slug}.html"`)) {
-    log('yellow', `  文章 ${slug} 已在列表中`)
-    return
+  // 文章列表不再是手改 README，而是从 frontmatter 生成——见
+  // scripts/sync-article-index.mjs。这里跑一次让本地预览立刻看到新文章，
+  // 'npm run dev' / 'npm run build' 也会各自跑一次，不追加跑这次也不会漏。
+  try {
+    execSync('node scripts/sync-article-index.mjs', { cwd: root, stdio: 'inherit' })
+  } catch {
+    log('yellow', '  文章索引生成失败，运行 npm run sync:articles 手动补一次')
   }
 
-  // 新文章HTML - 注意：不能有空行，否则VuePress会错误解析
-  const newItem = `<li class="lk-blog__item">
-      <a class="lk-blog__card" href="/article/${slug}.html">
-        <img class="lk-blog__cover" src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80" alt="" />
-        <div class="lk-blog__text">
-          <time class="lk-blog__date" datetime="${dateStr.slice(0, 10)}">${dateStr}</time>
-          <h3 class="lk-blog__post-title">${title}</h3>
-          <p class="lk-blog__excerpt">${title}</p>
-          <div class="lk-blog__meta">
-            <span class="lk-blog__read" aria-hidden="true">Read →</span>
-          </div>
-        </div>
-      </a>
-    </li>`
-
-  // 在 <ol class="lk-blog__list"> 后面插入，紧贴第一个 <li>
-  const listStart = content.indexOf('<ol class="lk-blog__list">')
-  if (listStart === -1) {
-    log('red', '错误: 找不到文章列表位置')
-    process.exit(1)
-  }
-
-  // 找到 </li> 后直接插入，确保没有空行
-  const firstLiEnd = content.indexOf('</li>', listStart)
-  if (firstLiEnd === -1) {
-    // 如果没有现有文章，在 <ol> 后直接插入
-    const insertPos = content.indexOf('>', listStart) + 1
-    content = content.slice(0, insertPos) + '\n    ' + newItem + content.slice(insertPos)
-  } else {
-    // 在第一个 </li> 后插入，紧跟其后
-    const insertPos = firstLiEnd + 5  // </li> 长度为5
-    content = content.slice(0, insertPos) + newItem + content.slice(insertPos)
-  }
-
-  fs.writeFileSync(readmePath, content, 'utf-8')
+  log('blue', `\n提示: 记得把 frontmatter 里的 description/cover/tags 填好，再运行 'npm run dev' 预览，满意后运行 'node scripts/article.mjs push' 推送`)
 }
 
 // 显示状态

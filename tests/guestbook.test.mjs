@@ -264,7 +264,7 @@ await test('昵称为空 / 正文为空都要报错', async () => {
   assert.equal(noText.statusCode, 400)
 })
 
-await test('QQ 号 / 邮箱各自生成头像，明文邮箱永不外吐', async () => {
+await test('QQ 号 / 邮箱 / GitHub 各自生成头像，明文邮箱永不外吐', async () => {
   const qq = await call({
     method: 'POST',
     body: { nick: 'klein', content: '好牛', contact: '123456789' },
@@ -277,6 +277,28 @@ await test('QQ 号 / 邮箱各自生成头像，明文邮箱永不外吐', async
     headers: fromIp('203.0.113.11'),
   })
   assert.ok(mail.payload.item.avatar.includes('cravatar.cn'))
+
+  /* GitHub 分支只认「像链接」或「@handle」这两种明确写法，裸用户名不算。 */
+  const ghUrl = await call({
+    method: 'POST',
+    body: { nick: 'torvalds', content: 'linux', contact: 'https://github.com/torvalds' },
+    headers: fromIp('203.0.113.12'),
+  })
+  assert.equal(ghUrl.payload.item.avatar, 'https://github.com/torvalds.png?size=100')
+
+  const ghHandle = await call({
+    method: 'POST',
+    body: { nick: 'octocat', content: 'hi', contact: '@octocat' },
+    headers: fromIp('203.0.113.13'),
+  })
+  assert.equal(ghHandle.payload.item.avatar, 'https://github.com/octocat.png?size=100')
+
+  const bareWord = await call({
+    method: 'POST',
+    body: { nick: '路人', content: '裸词不当用户名', contact: 'justaword' },
+    headers: fromIp('203.0.113.14'),
+  })
+  assert.equal(bareWord.payload.item.avatar, '')
 
   const anon = await call({ method: 'GET' })
   const dump = JSON.stringify(anon.payload)

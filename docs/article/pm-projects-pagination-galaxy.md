@@ -2,6 +2,8 @@
 title: Projects 作品集分页：把岗位、项目和文章串成招聘入口
 description: 记录这次把 PM 作品集前置、项目按岗位分页、文章列表分页，以及用 SiliconFlow 星系图做本地背景的迭代。
 date: 2026-04-22T07:10:00.000Z
+cover: /gallery/home-rec-projects-pagination.png
+tags: [PM, Projects, Portfolio]
 pageClass: page-article-post
 comment: false
 toc: true

@@ -2350,7 +2350,8 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .theme-hope-content {
 }
 
 .lk-proj-hub-fullbleed {
-  --lk-proj-portfolio-w: 400px;
+  /* 280px：跟 guestbook / article / about 的侧栏宽度看齐，统一四个页面的比例。 */
+  --lk-proj-portfolio-w: 280px;
   --lk-proj-col-gap: 24px;
   /* ribbon 吸顶高度（含 padding + 两侧文字行高）；左栏 sticky top 用它做偏移 */
   --lk-proj-ribbon-h: 3.6rem;
@@ -2363,6 +2364,9 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .theme-hope-content {
   flex-direction: column;
   box-sizing: border-box;
   overflow: visible;
+  /* 页尾前的呼吸感放在这一层，不放进 .lk-proj-cards：那样会让右栏比左栏（拉伸到
+     同一 grid row 高度的 AI 助手栏）矮一截 padding，两栏底边对不齐。 */
+  padding-bottom: 1.25rem;
 }
 
 /* 路由过渡：html[data-lk-route] 在 client.js beforeEach 已指向目标路径，往往早于 theme-container 的 pageClass 与主体内 VNode 替换。
@@ -2400,22 +2404,16 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
   display: none !important;
 }
 
-/* Projects hub 顶栏横幅：与下方侧栏 / 主列同宽对齐 */
-[data-theme='light'] main.vp-page:has(.lk-proj-hub-fullbleed) .lk-proj-hub-layout__ribbon-title {
-  color: #fff !important;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
-}
-
-[data-theme='dark'] main.vp-page:has(.lk-proj-hub-fullbleed) .lk-proj-hub-layout__ribbon-title {
-  color: #fff !important;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.72);
-}
-
 .lk-proj-hub-layout {
   display: grid;
   grid-template-columns: var(--lk-proj-portfolio-w) minmax(0, 1fr);
   row-gap: 14px;
   column-gap: var(--lk-proj-col-gap);
+  /* start，不是 stretch：main 列（ProjectCardsGrid）是分页的，翻页时每页项目
+     数量和卡片高度都不一样。stretch 会让左列（含 AiAssistantWidget，靠
+     flex:1 1 auto 填满剩余高度）跟着每次翻页重新拉伸/收缩，AI 卡片看起来
+     像在来回抽动——跟 article 列表页同一个坑，处理方式也一样：改成 start，
+     两列各自按自身内容定高。 */
   align-items: start;
   width: 100%;
   margin: 0 auto;
@@ -2423,58 +2421,6 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
   overflow: visible;
   box-sizing: border-box;
   padding-top: 0.35rem;
-}
-
-.lk-proj-hub-layout__ribbon {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: var(--lk-proj-portfolio-w) minmax(0, 1fr);
-  column-gap: var(--lk-proj-col-gap);
-  align-items: center;
-  align-self: start;
-  box-sizing: border-box;
-  padding: 0.75rem 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(
-    102deg,
-    rgba(251, 146, 60, 0.5) 0%,
-    rgba(14, 165, 233, 0.38) 34%,
-    rgba(99, 102, 241, 0.42) 68%,
-    rgba(45, 212, 191, 0.28) 100%
-  );
-  box-shadow: 0 10px 32px rgba(2, 6, 23, 0.22);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  /* 取消吸顶：跟着卡片一起自然滚动，保持「项目分类 / 项目列表」与下方卡片的相对位置 */
-  position: relative;
-  z-index: 1;
-}
-
-[data-theme='light'] .lk-proj-hub-layout__ribbon {
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
-}
-
-.lk-proj-hub-layout__ribbon-title {
-  margin: 0;
-  font-size: 1.5rem !important;
-  line-height: 1.2 !important;
-  font-weight: 900 !important;
-  letter-spacing: 0.02em;
-  border-bottom: none !important;
-  padding-bottom: 0 !important;
-  box-shadow: none !important;
-}
-
-.lk-proj-hub-layout__ribbon-title--right {
-  justify-self: start;
-}
-
-.lk-proj-hub-layout__ribbon-title::before,
-.lk-proj-hub-layout__ribbon-title::after {
-  content: none !important;
-  display: none !important;
 }
 
 .lk-proj-hub-layout__portfolio {
@@ -2486,9 +2432,6 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
   overflow: visible;
   padding-right: 8px;
   position: relative;
-  /* 关键：覆盖 grid 容器的 align-items: start，让左列拉伸到 row 高度，
-     这样 .lk-proj-side__sticky 才有足够的「可吸空间」来真正粘附在视口顶部。 */
-  align-self: stretch;
 }
 
 // 产品作品集头部
@@ -2612,17 +2555,6 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
     flex: none;
   }
 
-  .lk-proj-hub-layout__ribbon {
-    grid-template-columns: 1fr 1fr;
-    padding: 0.65rem 0.85rem;
-    /* 单列布局下不要吸顶，避免遮挡卡片 */
-    position: static;
-  }
-
-  .lk-proj-hub-layout__ribbon-title {
-    font-size: 1.22rem !important;
-  }
-
   .lk-proj-hub-layout__portfolio {
     max-width: none;
     height: auto;
@@ -2644,19 +2576,6 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
     grid-template-columns: 1fr;
     gap: 18px;
     overflow: visible;
-  }
-
-  /* ribbon 在单列移动端：左右两个标题改为单列竖排，与下方 portfolio / main 顺序一致 */
-  .lk-proj-hub-layout__ribbon {
-    grid-template-columns: 1fr !important;
-    row-gap: 0.35rem;
-  }
-  .lk-proj-hub-layout__ribbon-title--left {
-    order: 1;
-  }
-  .lk-proj-hub-layout__ribbon-title--right {
-    order: 2;
-    justify-self: start;
   }
 
   .lk-proj-hub-layout__portfolio {
@@ -5755,9 +5674,14 @@ main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
 
 .lk-aboutme__shell {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  /* 280px 跟 guestbook / tech hub 的侧栏宽度看齐，四个「侧栏 + 正文」页面统一比例。 */
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: clamp(1rem, 2vw, 1.75rem);
-  align-items: start;
+  /* stretch，不是 start：侧栏（.lk-aboutme__side）跟正文 panel（.lk-aboutme__main）
+     两栏「宽高统一」——只算这一行的两栏，地图（.lk-aboutme__globe-panel）是下面
+     单独一整行，不参与这次 stretch，所以侧栏（含 AI 问答）只会跟正文 panel 齐平，
+     不会被地图的高度拖长。 */
+  align-items: stretch;
   max-width: 1200px;          /* 与 .lk-article-three 的 1200px 看齐 */
   width: 100%;
   margin-inline: auto;
@@ -5776,15 +5700,20 @@ main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
-  align-self: start;
-  position: sticky;
-  top: calc(var(--navbar-height, 3.5rem) + 1rem);
+  /* align-self 不再是 start：配合 shell 的 stretch，让这一栏本身占满行高。
+     不设 position:sticky——跟 guestbook 的 lk-gb-main 同一个坑：sticky 元素被
+     align-items:stretch 撑到跟兄弟一样高（正好等于包含块高度）之后，sticky 会
+     完全失效退化成静态定位，因为「贴住视口」需要比包含块矮、留出可以贴着滑动
+     的余量，撑满之后没有余量可言。两个目标（撑到跟正文 panel 一样高 / 滚动时
+     贴在顶部）在这个场景下互斥，选前者：情願失去「滚动时侧栏吸顶」，也不要一会
+     儿跟正文对不齐、一会儿悬浮盖住下面的地图。 */
+  align-self: stretch;
 }
 
-@media (max-width: 860px) {
-  .lk-aboutme__side {
-    position: static;
-  }
+/* 侧栏最后一张卡跟着一起伸展，把 stretch 让出来的空白用自己的卡片背景填掉，
+   而不是留一段看不见边界的空气——这是唯一会「视觉可见」拉长的部分。 */
+.lk-aboutme__side > :last-child {
+  flex: 1 1 auto;
 }
 
 .lk-aboutme__card {
@@ -5816,6 +5745,11 @@ main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
 /* ── 右侧：自我介绍大正文 ──────────────────────────────────── */
 .lk-aboutme__main {
   min-width: 0;
+  /* 不跟侧栏互相拉平（不设 flex + flex:1 1 auto）：只让侧栏单方向跟着正文
+     走，跟 guestbook 的 lk-gb-rail 同一套。侧栏万一比正文 panel 还高（AI
+     问答卡自己有 260px min-height，正文内容少的时候可能发生），正文这边就
+     矮一截、底下露一小段背景，但换来的是 globe-panel 永远从两栏里最高的
+     那栏下面开始，不会被压住。 */
 }
 
 .lk-aboutme__panel {
@@ -5839,10 +5773,13 @@ main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
   color: #e2e8f0;
 }
 
-/* 足迹地图区：独立玻璃卡，与主栏 panel 错层；避免把 WebGL/大地图塞进带强 backdrop 的 panel */
+/* 足迹地图区：独立玻璃卡，与主栏 panel 错层；避免把 WebGL/大地图塞进带强 backdrop 的 panel。
+   lk-aboutme__shell 是两列 grid（侧栏 280px + 正文 1fr），globe-panel 是它的第三个
+   子元素——不显式 grid-column 的话会被 auto-flow 塞进第一列（跟侧栏同宽的窄条），
+   地图和标题都会被压扁成一条竖线。grid-column: 1 / -1 让它独占一整行，横跨两栏。 */
 .lk-aboutme__globe-panel {
+  grid-column: 1 / -1;
   width: 100%;
-  margin-top: 1.6rem;
   padding: clamp(1.4rem, 2.4vw, 2rem) clamp(1.4rem, 2.6vw, 2.25rem) clamp(1.6rem, 2.6vw, 2.25rem);
   border-radius: 22px;
   border: 1px solid rgba(15, 23, 42, 0.06);
@@ -5870,7 +5807,7 @@ main.vp-page:has(.lk-gb-page) [vp-content]:not(.custom) {
 }
 
 .lk-aboutme__globe-panel .lk-cnfp {
-  max-width: min(100%, 920px);
+  max-width: 100%;
   margin-inline: auto;
 }
 
@@ -8314,17 +8251,6 @@ html {
     gap: 18px !important;
     overflow: visible !important;
     flex: none !important;
-  }
-
-  .lk-proj-hub-layout__ribbon {
-    grid-template-columns: 1fr !important;
-    row-gap: 0.35rem !important;
-    position: static !important;
-    padding: 0.65rem 0.85rem !important;
-  }
-
-  .lk-proj-hub-layout__ribbon-title {
-    font-size: 1.22rem !important;
   }
 
   .lk-proj-hub-layout__portfolio {

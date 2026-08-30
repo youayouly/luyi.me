@@ -1,16 +1,5 @@
 <template>
   <div class="lk-gb-page">
-    <!-- 统计条 -->
-    <section v-if="items.length" class="lk-gb__stats">
-      <span class="lk-gb__stats-item">
-        💬 <strong data-lk-no-translate>{{ items.length }}</strong> 条留言
-      </span>
-      <span class="lk-gb__stats-sep" aria-hidden="true">·</span>
-      <span class="lk-gb__stats-item">
-        最新一条 <span data-lk-no-translate>{{ latestRelative }}</span>
-      </span>
-    </section>
-
     <div class="lk-gb">
     <!-- 右栏：发送留言 -->
     <aside class="lk-gb-rail">
@@ -112,15 +101,41 @@
 
         <div class="lk-gb__kaomoji">
           <button
-            v-for="face in KAOMOJI"
-            :key="face"
-            class="lk-gb__kaomoji-btn"
+            class="lk-gb__kaomoji-toggle"
             type="button"
-            :title="`插入 ${face}`"
-            @click="insertFace(face)"
+            :aria-expanded="kaomojiOpen"
+            :title="kaomojiOpen ? '收起表情' : '插入颜文字'"
+            @click="kaomojiOpen = !kaomojiOpen"
           >
-            {{ face }}
+            😊
           </button>
+
+          <div v-if="kaomojiOpen" class="lk-gb__kaomoji-panel">
+            <div class="lk-gb__kaomoji-grid">
+              <button
+                v-for="face in KAOMOJI_CATEGORIES[kaomojiTab].items"
+                :key="face"
+                class="lk-gb__kaomoji-btn"
+                type="button"
+                :title="`插入 ${face}`"
+                @click="insertFace(face)"
+              >
+                {{ face }}
+              </button>
+            </div>
+            <div class="lk-gb__kaomoji-tabs">
+              <button
+                v-for="(cat, idx) in KAOMOJI_CATEGORIES"
+                :key="cat.name"
+                type="button"
+                class="lk-gb__kaomoji-tab"
+                :class="{ 'lk-gb__kaomoji-tab--on': kaomojiTab === idx }"
+                @click="kaomojiTab = idx"
+              >
+                {{ cat.name }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <button class="lk-gb__preview-btn" type="button" @click="togglePreview">
@@ -136,20 +151,52 @@
       <p v-if="notice" class="lk-gb__notice" :class="{ 'lk-gb__notice--bad': noticeBad }">
         {{ notice }}<span v-if="!noticeBad" aria-hidden="true"> (๑˃ᴗ˂)✧</span>
       </p>
-      <p class="lk-gb__hint">
+      <p v-if="!isEnglish" class="lk-gb__hint">
         支持 <code>**粗体**</code>、<code>`代码`</code>、<code>&gt; 引用</code> 和链接。悄悄话只有站长看得见。
       </p>
+      <p v-else class="lk-gb__hint">
+        Supports <code>**bold**</code>, <code>`code`</code>, <code>&gt; quote</code>, and links. Whispers are only visible to the site administrator.
+      </p>
     </section>
+
+    <!-- 访客留言：跟下面那份分开放的占位卡——下面那份现在还是测试数据，
+         真实访客来留言之前先用这张空状态卡片占住位置，纯展示，不接数据。 -->
+    <section class="lk-gb__list">
+      <h2 class="lk-gb__list-title">{{ isEnglish ? '💬 Visitor Comments' : '💬 访客留言' }}</h2>
+      <p class="lk-gb__state">
+        {{ isEnglish ? 'No visitor comments yet — write the first one!' : '还没有访客留言，来写第一条吧。' }}
+      </p>
+    </section>
+
+    <!-- 测试留言：跟发送框同一栏，目前是开发期留的测试数据（Zephyr / octocat 那些
+         带 [TEST] 前缀的），不是真实访客发的。悄悄话游客看不到，不放在这一栏里，
+         免得它的高度牵连上面「左栏跟右栏对齐」的伸展计算——见下面整行的 lk-gb-whispers。 -->
+    <GuestbookThreadList
+      :title="isEnglish ? '💬 Test Comments' : '💬 测试留言'"
+      :threads="publicThreads"
+      :loading="loading"
+      :load-error="loadError"
+      :empty-text="isEnglish ? 'No public comments yet.' : '还没有公开留言，来写第一条。'"
+      :is-logged-in="isLoggedIn"
+      :avatar-of="avatarOf"
+      :initial="initial"
+      :place-of="placeOf"
+      :format-date="formatDate"
+      :has-reacted="hasReacted"
+      :failed-avatars="failedAvatars"
+      @react="react"
+      @reply="startReply"
+      @remove="remove"
+    />
     </aside>
 
-    <!-- 左栏：友链墙 + 申请友链 + 留言列表 -->
+    <!-- 左栏：友链墙 + 申请友链 -->
     <div class="lk-gb-main">
     <!-- 友链墙：数据来自 data/friendLinks.js，和关于页侧栏那张卡共用一份 -->
     <section class="lk-gb-friends">
       <header class="lk-gb-friends__head">
         <h2 class="lk-gb-friends__title">🔗 友链</h2>
         <span v-if="friends.length" class="lk-gb__count" data-lk-no-translate>{{ friends.length }}</span>
-        <button class="lk-gb-friends__apply" type="button" @click="fillFriendTemplate">申请友链</button>
       </header>
 
       <p v-if="!friends.length" class="lk-gb-friends__empty">
@@ -180,153 +227,42 @@
     <!-- 申请友链 -->
     <section class="lk-gb-apply">
       <h2 class="lk-gb-apply__title">🤝 申请友链</h2>
-      <p class="lk-gb-apply__text">
-        不用先加我，直接在上面留一条言就行。我加上你之后会在你那条留言下回复，你再把本站加上，互链完成。
-      </p>
 
       <div class="lk-gb-apply__self">
         <p class="lk-gb-apply__self-title">加本站用这份信息</p>
-        <dl data-lk-no-translate>
+        <dl>
           <div><dt>名称</dt><dd>Luke 的空间</dd></div>
-          <div><dt>网址</dt><dd>https://www.luyi.me</dd></div>
+          <div><dt>网址</dt><dd data-lk-no-translate>https://www.luyi.me</dd></div>
           <div><dt>简介</dt><dd>产品、技术、留学与生活</dd></div>
-          <div><dt>头像</dt><dd>https://www.luyi.me{{ siteAvatar }}</dd></div>
+          <div><dt>头像</dt><dd data-lk-no-translate>https://www.luyi.me{{ siteAvatar }}</dd></div>
         </dl>
       </div>
 
+      <button class="lk-gb-apply__btn" type="button" @click="fillFriendTemplate">自动申请友链</button>
     </section>
 
-    <!-- 留言列表 -->
-    <section class="lk-gb__list">
-      <header v-if="threads.length" class="lk-gb__list-head">
-        <span>全部留言</span>
-        <span class="lk-gb__count" data-lk-no-translate>{{ items.length }}</span>
-      </header>
-      <p v-if="loading" class="lk-gb__state">正在读取留言…</p>
-      <p v-else-if="loadError" class="lk-gb__state lk-gb__state--bad">{{ loadError }}</p>
-
-      <article v-for="thread in threads" :key="thread.id" class="lk-gb__thread">
-        <div class="lk-gb__item">
-          <span class="lk-gb__avatar" :class="{ 'lk-gb__avatar--owner': thread.owner }">
-            <img
-              v-if="avatarOf(thread) && !failedAvatars.has(thread.id)"
-              :src="avatarOf(thread)"
-              alt=""
-              loading="lazy"
-              @error="failedAvatars.add(thread.id)"
-            />
-            <span v-else data-lk-no-translate>{{ initial(thread.nick) }}</span>
-          </span>
-
-          <div class="lk-gb__body">
-            <header class="lk-gb__meta">
-              <component
-                :is="thread.site ? 'a' : 'span'"
-                class="lk-gb__nick no-external-link-icon"
-                :href="thread.site || undefined"
-                :target="thread.site ? '_blank' : undefined"
-                :rel="thread.site ? 'nofollow noopener noreferrer' : undefined"
-                data-lk-no-translate
-                >{{ thread.nick }}</component
-              >
-              <span v-if="thread.owner" class="lk-gb__badge">站长</span>
-              <span v-if="thread.verified" class="lk-gb__badge lk-gb__badge--ok">已验证</span>
-              <span v-if="thread.private" class="lk-gb__badge lk-gb__badge--quiet">悄悄话</span>
-              <span v-if="placeOf(thread)" class="lk-gb__place" data-lk-no-translate>{{ placeOf(thread) }}</span>
-              <span class="lk-gb__date" :title="thread.at">{{ formatDate(thread.at) }}</span>
-            </header>
-
-            <div v-if="thread.redacted" class="lk-gb__redacted">这是一条悄悄话，只有站长看得到。</div>
-            <div v-else class="lk-gb__content" data-lk-no-translate v-html="thread.html" />
-
-            <footer class="lk-gb__actions">
-              <span class="lk-gb__reacts">
-                <button
-                  v-for="emoji in REACTIONS"
-                  :key="emoji"
-                  class="lk-gb__react"
-                  :class="{ 'lk-gb__react--on': hasReacted(thread.id, emoji) }"
-                  type="button"
-                  @click="react(thread, emoji)"
-                >
-                  <span aria-hidden="true">{{ emoji }}</span>
-                  <span v-if="thread.reactions && thread.reactions[emoji]" data-lk-no-translate>{{ thread.reactions[emoji] }}</span>
-                </button>
-              </span>
-              <button class="lk-gb__link-btn" type="button" @click="startReply(thread)">回复</button>
-              <button
-                v-if="isLoggedIn"
-                class="lk-gb__link-btn lk-gb__link-btn--danger"
-                type="button"
-                @click="remove(thread)"
-              >
-                删除
-              </button>
-              <span v-if="isLoggedIn && thread.contact" class="lk-gb__admin-note" data-lk-no-translate>
-                {{ thread.contact }} · {{ thread.device }}
-              </span>
-            </footer>
-          </div>
-        </div>
-
-        <div v-for="reply in thread.replies" :key="reply.id" class="lk-gb__item lk-gb__item--reply">
-          <span class="lk-gb__avatar" :class="{ 'lk-gb__avatar--owner': reply.owner }">
-            <img
-              v-if="avatarOf(reply) && !failedAvatars.has(reply.id)"
-              :src="avatarOf(reply)"
-              alt=""
-              loading="lazy"
-              @error="failedAvatars.add(reply.id)"
-            />
-            <span v-else data-lk-no-translate>{{ initial(reply.nick) }}</span>
-          </span>
-          <div class="lk-gb__body">
-            <header class="lk-gb__meta">
-              <component
-                :is="reply.site ? 'a' : 'span'"
-                class="lk-gb__nick no-external-link-icon"
-                :href="reply.site || undefined"
-                :target="reply.site ? '_blank' : undefined"
-                :rel="reply.site ? 'nofollow noopener noreferrer' : undefined"
-                data-lk-no-translate
-                >{{ reply.nick }}</component
-              >
-              <span v-if="reply.owner" class="lk-gb__badge">站长</span>
-              <span v-if="reply.verified" class="lk-gb__badge lk-gb__badge--ok">已验证</span>
-              <span v-if="placeOf(reply)" class="lk-gb__place" data-lk-no-translate>{{ placeOf(reply) }}</span>
-              <span class="lk-gb__date" :title="reply.at">{{ formatDate(reply.at) }}</span>
-            </header>
-            <div v-if="reply.redacted" class="lk-gb__redacted">这是一条悄悄话，只有站长看得到。</div>
-            <div v-else class="lk-gb__content" data-lk-no-translate v-html="reply.html" />
-            <footer class="lk-gb__actions">
-              <span class="lk-gb__reacts">
-                <button
-                  v-for="emoji in REACTIONS"
-                  :key="emoji"
-                  class="lk-gb__react"
-                  :class="{ 'lk-gb__react--on': hasReacted(reply.id, emoji) }"
-                  type="button"
-                  @click="react(reply, emoji)"
-                >
-                  <span aria-hidden="true">{{ emoji }}</span>
-                  <span v-if="reply.reactions && reply.reactions[emoji]" data-lk-no-translate>{{ reply.reactions[emoji] }}</span>
-                </button>
-              </span>
-              <button class="lk-gb__link-btn" type="button" @click="startReply(thread)">回复</button>
-              <button
-                v-if="isLoggedIn"
-                class="lk-gb__link-btn lk-gb__link-btn--danger"
-                type="button"
-                @click="remove(reply)"
-              >
-                删除
-              </button>
-            </footer>
-          </div>
-        </div>
-      </article>
-    </section>
+    <AiAssistantWidget class="lk-gb-assistant" />
     </div>
+
+    <!-- 悄悄话：单独一整行，横跨两栏，放在左右栏下面——游客看不到这部分内容，
+         它的高度不该影响上面左栏（含 AI 问答）跟右栏对齐时的伸展计算。 -->
+    <section class="lk-gb-whispers">
+    <GuestbookThreadList
+      :title="isEnglish ? '🤫 Whispers' : '🤫 悄悄话'"
+      :threads="privateThreads"
+      :is-logged-in="isLoggedIn"
+      :empty-text="isEnglish ? 'No whispers yet.' : '还没有悄悄话。'"
+      :avatar-of="avatarOf"
+      :initial="initial"
+      :place-of="placeOf"
+      :format-date="formatDate"
+      :has-reacted="hasReacted"
+      :failed-avatars="failedAvatars"
+      @react="react"
+      @reply="startReply"
+      @remove="remove"
+    />
+    </section>
     </div>
 
   </div>
@@ -349,22 +285,34 @@ import { useIsLoggedIn } from '../utils/authGate.js'
 import { pageLang } from '../utils/pageTranslate.js'
 import { SOURCE_LANG } from '../utils/translatePref.js'
 import { readSiteApiCreds } from '../utils/siteApiCreds.js'
-import { formatRelativeTime } from '../utils/relativeTimeZh.js'
 import { guestbookDraft } from '../utils/guestbookDraft.js'
+import GuestbookThreadList from './GuestbookThreadList.vue'
+import AiAssistantWidget from './AiAssistantWidget.vue'
 import { friendLinks } from '../data/friendLinks.js'
 import { formatPlace } from '../data/placeNames.js'
 import { siteConfig } from '../site.config.js'
 
 const API = '/api/guestbook'
-/** 和服务端 REACTIONS 白名单一一对应，改一边要改两边 */
-const REACTIONS = ['👍', '🎉', '🤝', '😂']
+/** 表情白名单现在只在 GuestbookThreadList.vue 里用（渲染按钮那份），这边不用重复声明 */
 /** 点过的表情记在本地，只为把按钮点亮；真正的一次限制在服务端的 SET NX 上 */
 const REACTED_KEY = 'lk_gb_reacted'
 /** 正文草稿见 utils/guestbookDraft.js：站内切页面不丢，整页刷新会丢 */
 /** 和服务端 MAX_CHARS 对齐；计数器和 maxlength 都读它 */
 const MAX_CHARS = 1000
 
-const KAOMOJI = ['(๑˃ᴗ˂)✧', '(੭ˊ꒳ˋ)੭', '(´｡• ᵕ •｡`)', '(๑•̀ㅂ•́)و', '(◍•ᴗ•◍)', 'ヾ(≧▽≦*)o']
+/** 颜文字面板：原来是一整排铺开的 6 个，现在按情绪分了几个 tab，点表情按钮展开/收起。 */
+const KAOMOJI_CATEGORIES = [
+  { name: '经典', items: ['(๑˃ᴗ˂)✧', '(੭ˊ꒳ˋ)੭', '(´｡• ᵕ •｡`)', '(๑•̀ㅂ•́)و', '(◍•ᴗ•◍)', 'ヾ(≧▽≦*)o'] },
+  { name: '卖萌', items: ['(＾▽＾)', '(´▽`)', '٩(◕‿◕｡)۶', '(๑´ㅁ`)ﻭ✧', '(⁎⁍̴̛ᴗ⁍̴̛⁎)', '(๑˘͈ᵕ˘͈)◞'] },
+  { name: '生气', items: ['(｀Д´)', '(╯°□°）╯', '（＃｀Д´）', '(￣^￣)', '(っ˘̩╭╮˘̩)っ', '(；ﾟДﾟ)'] },
+  { name: '疑惑', items: ['(⊙ｏ⊙)', '(°ロ°)', '( ゜Д゜)', 'Σ(っ°Д°;)っ', '(・∀・)', '(´･ω･`)'] },
+  { name: '加油', items: ['٩(๑❛ᴗ❛๑)۶', '(ง •_•)ง', 'o(*￣▽￣*)ブ', '(ノ°ο°)ノ', 'ᕙ(⇀‸↼‶)ᕗ'] },
+  { name: '难过', items: ['(；´Д｀)', '(っ °Д °;)っ', '(╥﹏╥)', '(；へ：)', '(ᵕ人ᵕ)'] },
+  { name: '比心', items: ['(づ｡◕‿‿◕｡)づ', '♡(˃͈ દ ˂͈ ༶ )', '(づ￣ ³￣)づ', '( •ॢ◡-ॢ)-♡', 'ᕕ( ᐛ )ᕗ'] },
+  { name: '动物', items: ['ฅ(＾・ω・＾ฅ)', '(=^･ω･^=)', '▽・ω・▽', '/(=^･ω･^=)＼', '(ㅅ´ ˘ `)'] },
+]
+const kaomojiOpen = ref(false)
+const kaomojiTab = ref(0)
 
 const isLoggedIn = useIsLoggedIn()
 
@@ -378,14 +326,14 @@ const ph = computed(() =>
     ? {
         content: 'Your message. Markdown supported',
         nick: 'Nickname',
-        contact: 'Email / QQ number (optional, used for your avatar)',
+        contact: 'Email / QQ / GitHub (optional, used for your avatar)',
         site: 'Your site (optional)',
         code: '6-digit code',
       }
     : {
         content: '留言内容，支持 Markdown',
         nick: '昵称',
-        contact: '邮箱 / QQ 号（选填，用来取头像）',
+        contact: '邮箱 / QQ 号 / GitHub（选填，用来取头像）',
         site: '你的网站（选填）',
         code: '6 位验证码',
       },
@@ -434,22 +382,9 @@ const threads = computed(() => {
   }))
 })
 
-/** 统计条用：所有留言（含回复）里最新的一条时间，纯本地算，不必再问服务端。 */
-const latestAt = computed(() => {
-  let best = ''
-  let bestT = -Infinity
-  for (const item of items.value) {
-    const t = new Date(item.at).getTime()
-    if (!Number.isNaN(t) && t > bestT) {
-      bestT = t
-      best = item.at
-    }
-  }
-  return best
-})
-const latestRelative = computed(() =>
-  latestAt.value ? formatRelativeTime(latestAt.value, isEnglish.value) : '',
-)
+/** 悄悄话跟公开留言分两栏显示：按 private 拆，回复跟着父留言走，不单独拆。 */
+const privateThreads = computed(() => threads.value.filter((top) => top.private))
+const publicThreads = computed(() => threads.value.filter((top) => !top.private))
 
 function say(text, bad = false) {
   notice.value = text
@@ -548,16 +483,20 @@ function hasReacted(id, emoji) {
 }
 
 /**
- * 点一个表情。前端先把数字加上去（乐观更新），服务端拒绝再退回来——
+ * 点一个表情，再点一次取消。前端先乐观更新，服务端拒绝再退回来——
  * 这个动作太轻量，等一个往返再变色会显得很迟钝。
  */
 async function react(item, emoji) {
   const mark = `${item.id}:${emoji}`
-  if (reacted.value.has(mark)) return
+  const already = reacted.value.has(mark)
 
   const before = item.reactions ? { ...item.reactions } : {}
-  item.reactions = { ...before, [emoji]: (before[emoji] || 0) + 1 }
-  reacted.value = new Set([...reacted.value, mark])
+  const beforeReacted = new Set(reacted.value)
+
+  item.reactions = { ...before, [emoji]: Math.max(0, (before[emoji] || 0) + (already ? -1 : 1)) }
+  const nextReacted = new Set(reacted.value)
+  already ? nextReacted.delete(mark) : nextReacted.add(mark)
+  reacted.value = nextReacted
   try {
     localStorage.setItem(REACTED_KEY, JSON.stringify([...reacted.value]))
   } catch {
@@ -568,14 +507,20 @@ async function react(item, emoji) {
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'react', id: item.id, emoji }),
+      body: JSON.stringify({ action: already ? 'unreact' : 'react', id: item.id, emoji }),
     })
     const data = await res.json()
     if (!data.ok) throw new Error(data.error || '点不上')
-    /* 服务端返回真实计数（可能别人也点了），以它为准 */
+    /* 服务端返回真实计数（可能别人也点了/取消了），以它为准 */
     if (Number.isFinite(data.count)) item.reactions = { ...item.reactions, [emoji]: data.count }
   } catch {
     item.reactions = before
+    reacted.value = beforeReacted
+    try {
+      localStorage.setItem(REACTED_KEY, JSON.stringify([...reacted.value]))
+    } catch {
+      /* 无痕模式写不了就算了 */
+    }
   }
 }
 
@@ -597,9 +542,11 @@ const friends = friendLinks
 const siteAvatar = siteConfig.avatar
 
 
-/** 友链申请模板：填进输入框并把焦点移过去，省得访客自己想格式。 */
+/** 友链申请模板：填进输入框并把焦点移过去，省得访客自己想格式。跟 isEnglish 走，别让页面是英文、模板还是中文。 */
 function fillFriendTemplate() {
-  form.content = ['申请友链', '名称：', '网址：', '简介：', '头像：（可选，图片直链）'].join('\n')
+  form.content = isEnglish.value
+    ? ['Friend link application', 'Name:', 'URL:', 'Description:', 'Avatar: (optional, direct image link)'].join('\n')
+    : ['申请友链', '名称：', '网址：', '简介：', '头像：（可选，图片直链）'].join('\n')
   replyTo.value = null
   const box = document.querySelector('.lk-gb__textarea')
   box?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -733,6 +680,9 @@ onMounted(() => {
  * 桌面宽度靠 grid order 把视觉顺序换成「main 在左、rail 在右」，
  * 和 /tech、/article 页一样中间两栏分布。
  * 断点提到 1200px：右栏变宽后，更窄的话会把左边挤没。
+ * 悄悄话（lk-gb-whispers）不算进这两栏——游客看不到它，它单独占一整行放在
+ * 两栏下面，这样左栏（含 AI 问答）跟右栏的 stretch 高度只看「组成 + 公开留言」，
+ * 不会被悄悄话的高度拖长。
  */
 .lk-gb-page {
   display: flex;
@@ -759,18 +709,44 @@ onMounted(() => {
 
 @media (min-width: 1200px) {
   .lk-gb {
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-    align-items: start;
+    /* 280px：跟 about / article / tech hub 的侧栏宽度看齐，统一四个页面的比例。 */
+    grid-template-columns: 280px minmax(0, 1fr);
+    /* stretch：跟 about / article / tech 侧栏同一套——左栏（友链+AI 问答）跟着
+       右栏（发送框 + 留言）的高度长，而不是各走各的。右栏本身不参与「被撑
+       高」，靠下面 .lk-gb-rail 的 align-self:start 单独跳出去，右栏永远按
+       自己内容的高度出。左栏万一比右栏还高（AI 问答卡自己有 260px
+       min-height，留言很少的时候可能发生），右栏就矮一截、底下露一小段
+       背景。 */
+    align-items: stretch;
   }
 
   .lk-gb-rail {
     order: 2;
-    position: sticky;
-    top: calc(var(--navbar-height, 3.75rem) + 1rem);
+    align-self: start;
   }
 
   .lk-gb-main {
     order: 1;
+    /* 最后一张卡 flex:1 1 auto 把 stretch 让出来的高度填成自己的卡片背景。
+       不设 position:sticky——试过（连同 .lk-gb-whispers 单独拆一个 grid 隔离
+       包含块）发现这条浏览器规则：sticky 元素如果被 align-items:stretch 撑到
+       跟兄弟一样高（height 正好等于包含块高度），sticky 就完全失效、退化成
+       普通静态定位——因为「贴住视口」需要元素比包含块矮，留出可以贴着滑动
+       的余量，撑满之后没有余量可言。两个目标（撑到跟右栏一样高 / 滚动时贴
+       在顶部）在这个场景下互斥，选前者：情願失去「滚动时 AI 问答卡吸顶」，
+       也不要一会儿跟右栏对不齐、一会儿悬浮盖住下面的整行模块。 */
+  }
+
+  .lk-gb-main > :last-child {
+    flex: 1 1 auto;
+  }
+
+  /* 悄悄话独占一整行，横跨两栏——它不参与上面这一行 stretch 的高度计算，
+     所以左栏（含 AI 问答）的伸展只跟着右栏「组成 + 真实留言占位 + 公开留言」走，
+     不会被游客看不见的悄悄话拖长。 */
+  .lk-gb-whispers {
+    order: 3;
+    grid-column: 1 / -1;
   }
 }
 
@@ -782,45 +758,8 @@ onMounted(() => {
   min-width: 0;
 }
 
-/* ── 统计条 ─────────────────────────────────────────────── */
-.lk-gb__stats {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: fit-content;
-  max-width: 100%;
-  padding: 0.5rem 0.9rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  color: var(--vp-c-text-2, #475569);
-  background: rgba(224, 242, 254, 0.55);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-}
-
-.lk-gb__stats-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  white-space: nowrap;
-}
-
-.lk-gb__stats-item strong {
-  color: #0369a1;
-  font-variant-numeric: tabular-nums;
-}
-
-.lk-gb__stats-sep {
-  color: var(--vp-c-text-3, #94a3b8);
-}
-
-[data-theme='dark'] .lk-gb__stats {
-  background: rgba(30, 58, 138, 0.28);
-  border-color: rgba(56, 189, 248, 0.28);
-  color: rgba(226, 232, 240, 0.82);
-}
-
-[data-theme='dark'] .lk-gb__stats-item strong {
-  color: #7dd3fc;
+.lk-gb-whispers {
+  min-width: 0;
 }
 
 /* ── 发送区 ─────────────────────────────────────────────── */
@@ -1030,11 +969,6 @@ onMounted(() => {
   color: var(--vp-c-text-3, #94a3b8);
 }
 
-.lk-gb__badge.lk-gb__badge--ok {
-  color: #065f46;
-  background: rgba(167, 243, 208, 0.9);
-}
-
 .lk-gb__options {
   display: flex;
   flex-wrap: wrap;
@@ -1056,10 +990,45 @@ onMounted(() => {
   flex: 1 1 auto;
 }
 
+/* 表情按钮 + 展开的浮层面板，面板往上开（工具条贴在输入框底部，往下开会被卡片边界切掉）。 */
 .lk-gb__kaomoji {
+  position: relative;
+  display: flex;
+}
+
+.lk-gb__kaomoji-toggle {
+  padding: 0.16rem 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(224, 242, 254, 0.7);
+  cursor: pointer;
+}
+
+.lk-gb__kaomoji-toggle:hover {
+  background: rgba(186, 230, 253, 0.9);
+}
+
+.lk-gb__kaomoji-panel {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 5;
+  width: 260px;
+  padding: 0.55rem 0.55rem 0.4rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.lk-gb__kaomoji-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
 }
 
 .lk-gb__kaomoji-btn {
@@ -1075,6 +1044,34 @@ onMounted(() => {
 
 .lk-gb__kaomoji-btn:hover {
   background: rgba(186, 230, 253, 0.9);
+}
+
+.lk-gb__kaomoji-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.lk-gb__kaomoji-tab {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72rem;
+  color: var(--vp-c-text-2, #475569);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+
+.lk-gb__kaomoji-tab:hover {
+  background: rgba(226, 232, 240, 0.7);
+}
+
+.lk-gb__kaomoji-tab--on {
+  color: #0369a1;
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(224, 242, 254, 0.9);
 }
 
 .lk-gb__send {
@@ -1118,24 +1115,6 @@ onMounted(() => {
 
 .lk-gb__hint code {
   font-size: 0.72rem;
-}
-
-/* ── 列表 ───────────────────────────────────────────────── */
-.lk-gb__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.lk-gb__list-head {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0 0.2rem 0.1rem;
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--vp-c-text-2, #475569);
 }
 
 .lk-gb__count {
@@ -1286,13 +1265,6 @@ onMounted(() => {
   border: none;
 }
 
-.lk-gb-apply__text {
-  margin: 0 0 0.6rem;
-  font-size: 0.78rem;
-  line-height: 1.65;
-  color: var(--vp-c-text-2, #475569);
-}
-
 .lk-gb-apply__self {
   margin-bottom: 0.6rem;
   padding: 0.5rem 0.6rem;
@@ -1355,6 +1327,146 @@ onMounted(() => {
   background: rgba(186, 230, 253, 0.95);
 }
 
+/* ── 暗色 ───────────────────────────────────────────────── */
+[data-theme='dark'] .lk-gb__composer {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border-color: rgba(71, 85, 105, 0.6);
+}
+
+[data-theme='dark'] .lk-gb__textarea,
+[data-theme='dark'] .lk-gb__field {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(71, 85, 105, 0.7);
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .lk-gb__kaomoji-toggle,
+[data-theme='dark'] .lk-gb__kaomoji-btn {
+  color: #7dd3fc;
+  background: rgba(30, 58, 138, 0.35);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+[data-theme='dark'] .lk-gb__kaomoji-panel {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: rgba(71, 85, 105, 0.6);
+}
+
+[data-theme='dark'] .lk-gb__kaomoji-tabs {
+  border-top-color: rgba(71, 85, 105, 0.5);
+}
+
+[data-theme='dark'] .lk-gb__kaomoji-tab--on {
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(30, 58, 138, 0.45);
+}
+
+[data-theme='dark'] .lk-gb__count {
+  color: #7dd3fc;
+  background: rgba(30, 58, 138, 0.4);
+}
+
+[data-theme='dark'] .lk-gb-friends {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(71, 85, 105, 0.5);
+}
+
+[data-theme='dark'] .lk-gb-friends__card {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(71, 85, 105, 0.6);
+}
+
+[data-theme='dark'] .lk-gb-friends__apply {
+  color: #7dd3fc;
+  background: rgba(30, 58, 138, 0.35);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+[data-theme='dark'] .lk-gb-apply__self {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+
+[data-theme='dark'] .lk-gb-apply {
+  background: linear-gradient(160deg, rgba(12, 18, 52, 0.82) 0%, rgba(48, 18, 72, 0.8) 100%);
+  border-color: rgba(180, 140, 255, 0.28);
+  color: rgba(230, 235, 255, 0.92);
+}
+
+[data-theme='dark'] .lk-gb-apply__btn {
+  color: #7dd3fc;
+  background: rgba(30, 58, 138, 0.35);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+[data-theme='dark'] .lk-gb__me {
+  color: #7dd3fc;
+  background: linear-gradient(180deg, rgba(30, 58, 138, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+[data-theme='dark'] .lk-gb__preview {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+[data-theme='dark'] .lk-gb__preview-tag {
+  background: #16233c;
+  color: #7dd3fc;
+}
+
+[data-theme='dark'] .lk-gb__preview-btn {
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(71, 85, 105, 0.7);
+}
+
+[data-theme='dark'] .lk-gb__verify-btn {
+  color: #7dd3fc;
+  background: rgba(30, 58, 138, 0.35);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+@media (max-width: 560px) {
+  .lk-gb__options {
+    gap: 0.5rem;
+  }
+}
+</style>
+
+<style>
+/*
+ * 留言列表用的样式，专门不带 scoped：留言板拆成两栏后，这些类名同时用在
+ * GuestbookBoard.vue 自己（发言预览区）和 GuestbookThreadList.vue（两份列表）
+ * 两个文件的模板里，scoped 的 data-v-xxx 只会点到当前文件，够不到子组件，
+ * 所以干脆搬成全局选择器——反正 lk- 前缀本来就是为了不跟别处撞名。
+ * :deep() 是 scoped 专用语法，搬出来之后改回普通选择器就行，效果一样。
+ */
+/*
+ * 留言列表现在是「一张卡片，逐行，中间细分割线」——跟 AboutTimeline.vue 改版
+ * 同一个思路：一堆各自带背景/圆角/阴影的小卡片摞在一起太碎，合成一张卡更清爽。
+ * .lk-gb__thread 因此从「自己是一张卡」变成「卡片里的一行」，横向留白交给
+ * 外层 .lk-gb__list 的 padding，自己只留竖直方向的行间距 + 底边分割线。
+ */
+.lk-gb__list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.85rem 1rem 0.4rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  backdrop-filter: blur(8px);
+}
+
+.lk-gb__list-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+}
+
 .lk-gb__state {
   margin: 1.2rem 0;
   text-align: center;
@@ -1367,11 +1479,13 @@ onMounted(() => {
 }
 
 .lk-gb__thread {
-  padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  backdrop-filter: blur(8px);
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.lk-gb__thread:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0.45rem;
 }
 
 .lk-gb__item {
@@ -1448,6 +1562,11 @@ a.lk-gb__nick::after {
   background: rgba(253, 230, 138, 0.9);
 }
 
+.lk-gb__badge.lk-gb__badge--ok {
+  color: #065f46;
+  background: rgba(167, 243, 208, 0.9);
+}
+
 .lk-gb__badge--quiet {
   color: #475569;
   background: rgba(226, 232, 240, 0.9);
@@ -1475,18 +1594,18 @@ a.lk-gb__nick::after {
   overflow-wrap: anywhere;
 }
 
-.lk-gb__content :deep(p) {
+.lk-gb__content p {
   margin: 0.3rem 0;
 }
 
-.lk-gb__content :deep(pre) {
+.lk-gb__content pre {
   padding: 0.55rem 0.7rem;
   overflow-x: auto;
   border-radius: 0.6rem;
   background: rgba(15, 23, 42, 0.06);
 }
 
-.lk-gb__content :deep(blockquote) {
+.lk-gb__content blockquote {
   margin: 0.4rem 0;
   padding-left: 0.7rem;
   border-left: 3px solid rgba(147, 197, 253, 0.9);
@@ -1562,100 +1681,19 @@ a.lk-gb__nick::after {
   color: var(--vp-c-text-3, #94a3b8);
 }
 
-/* ── 暗色 ───────────────────────────────────────────────── */
-[data-theme='dark'] .lk-gb__composer {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.9) 100%);
-  border-color: rgba(71, 85, 105, 0.6);
-}
-
-[data-theme='dark'] .lk-gb__textarea,
-[data-theme='dark'] .lk-gb__field {
-  background: rgba(15, 23, 42, 0.6);
-  border-color: rgba(71, 85, 105, 0.7);
-  color: #e2e8f0;
+[data-theme='dark'] .lk-gb__list {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(71, 85, 105, 0.5);
 }
 
 [data-theme='dark'] .lk-gb__thread {
-  background: rgba(30, 41, 59, 0.6);
-  border-color: rgba(71, 85, 105, 0.5);
+  border-bottom-color: rgba(71, 85, 105, 0.45);
 }
 
 [data-theme='dark'] .lk-gb__avatar {
   color: #7dd3fc;
   background: linear-gradient(180deg, rgba(30, 58, 138, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%);
   border-color: rgba(56, 189, 248, 0.4);
-}
-
-[data-theme='dark'] .lk-gb__kaomoji-btn {
-  color: #7dd3fc;
-  background: rgba(30, 58, 138, 0.35);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-[data-theme='dark'] .lk-gb__count {
-  color: #7dd3fc;
-  background: rgba(30, 58, 138, 0.4);
-}
-
-[data-theme='dark'] .lk-gb-friends {
-  background: rgba(30, 41, 59, 0.6);
-  border-color: rgba(71, 85, 105, 0.5);
-}
-
-[data-theme='dark'] .lk-gb-friends__card {
-  background: rgba(15, 23, 42, 0.5);
-  border-color: rgba(71, 85, 105, 0.6);
-}
-
-[data-theme='dark'] .lk-gb-friends__apply {
-  color: #7dd3fc;
-  background: rgba(30, 58, 138, 0.35);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-[data-theme='dark'] .lk-gb-apply__self {
-  background: rgba(15, 23, 42, 0.55);
-}
-
-
-[data-theme='dark'] .lk-gb-apply {
-  background: linear-gradient(160deg, rgba(12, 18, 52, 0.82) 0%, rgba(48, 18, 72, 0.8) 100%);
-  border-color: rgba(180, 140, 255, 0.28);
-  color: rgba(230, 235, 255, 0.92);
-}
-
-[data-theme='dark'] .lk-gb-apply__btn {
-  color: #7dd3fc;
-  background: rgba(30, 58, 138, 0.35);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-[data-theme='dark'] .lk-gb__me {
-  color: #7dd3fc;
-  background: linear-gradient(180deg, rgba(30, 58, 138, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%);
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
-[data-theme='dark'] .lk-gb__preview {
-  background: rgba(15, 23, 42, 0.5);
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
-[data-theme='dark'] .lk-gb__preview-tag {
-  background: #16233c;
-  color: #7dd3fc;
-}
-
-[data-theme='dark'] .lk-gb__preview-btn {
-  color: rgba(226, 232, 240, 0.9);
-  background: rgba(15, 23, 42, 0.6);
-  border-color: rgba(71, 85, 105, 0.7);
-}
-
-[data-theme='dark'] .lk-gb__verify-btn {
-  color: #7dd3fc;
-  background: rgba(30, 58, 138, 0.35);
-  border-color: rgba(56, 189, 248, 0.35);
 }
 
 [data-theme='dark'] .lk-gb__badge.lk-gb__badge--ok {
@@ -1679,17 +1717,13 @@ a.lk-gb__nick::after {
   background: rgba(30, 58, 138, 0.45);
 }
 
-[data-theme='dark'] .lk-gb__content :deep(pre) {
+[data-theme='dark'] .lk-gb__content pre {
   background: rgba(226, 232, 240, 0.1);
 }
 
 @media (max-width: 560px) {
   .lk-gb__item--reply {
     margin-left: 1.2rem;
-  }
-
-  .lk-gb__options {
-    gap: 0.5rem;
   }
 }
 </style>

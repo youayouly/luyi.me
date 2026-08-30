@@ -2,6 +2,8 @@
 title: Edge AI 部署流水线的几笔记录
 description: 设备端推理前的最小检查清单草稿。
 date: 2026-04-12
+cover: /gallery/article-soft-edge-ai.png
+tags: [Embedded, ML]
 pageClass: page-article-post
 comment: false
 toc: true
