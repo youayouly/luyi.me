@@ -1,0 +1,10 @@
+# 只影响「部署时打包哪些文件」，不影响 git 跟踪。
+#
+# api/sync.js 和 api/git-push.js 是本地开发专用（分别走 `git pull` /
+# 本地提交+推送），生产环境永远不会调用，但 Vercel 会把 api/ 下每个 .js
+# 都当成一个 Serverless Function。Hobby 套餐每次部署最多 12 个函数，
+# api/guestbook.js 上线后总数变成 13，导致部署卡在 "Deploying outputs"
+# 阶段失败（见 2026-08-29 晚的推送事故）。排除这两个不影响生产的文件，
+# 把函数数降回 11。
+api/sync.js
+api/git-push.js
