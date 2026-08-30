@@ -129,11 +129,14 @@ watch(
 }
 
 /* ── Sticky container：position sticky + max-height 滚动 ──
-   不再跟 main 列（分页的 ProjectCardsGrid）做高度匹配——见 index.scss 里
-   .lk-proj-hub-layout 的注释：main 每页项目数量不同，stretch 会让下面的
-   AiAssistantWidget（它自己 height:100% 跟随父级）跟着每次翻页重新拉伸，
-   看起来像在抽动。现在整条链路都按自身内容定高，AI 卡片固定在组件自己的
-   min-height，不再依赖父级传下来的「撑满行高」信号。 */
+   不跟 main 列（分页的 ProjectCardsGrid）做逐像素高度匹配——main 每页项目
+   数量不同，若靠一个写死的 px 数字去凑「两栏底边齐平」，只在某一种缩放/
+   分辨率/当页卡片数下凑得上，换一种就露出大缺口或反过来溢出（连续点几次
+   分类筛选、或把浏览器缩放调到 110%/50%都能看见）。改成让这个 sticky 容器
+   自己封顶在「视口高度」而不是「main 列高度」：max-height 卡在视口，
+   超出部分内部滚动；容器内部再用 flex 让最后一张卡（AI 问答）去吃掉容器
+   高度里未被分类卡占满的剩余部分。视口高度会随缩放同步变化，这样任何
+   缩放级别下侧栏都能撑到视口底部附近，不再依赖某个固定像素数。 */
 .lk-proj-side__sticky {
   position: sticky;
   top: calc(var(--navbar-height, 3.5rem) + 1.25rem);
@@ -142,20 +145,33 @@ watch(
   gap: 0.65rem;
   z-index: 4;
   width: 100%;
+  /* flex-grow 只在容器有「多出来的空间」可分时才起作用，光设 max-height（上限）
+     不会让容器主动长到那么高；改用 height 给它一个确定的目标高度，AI 卡片才有
+     东西可以 flex:1 1 auto 去吃。分类卡本身内容碰巧比这个高度还高时，
+     overflow-y:auto 兜底内部滚动，不强行压扁分类卡。 */
+  height: calc(100vh - var(--navbar-height, 3.5rem) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 
-/* AI 卡片自己的固定高度：main 列（分页项目卡）实测高度减去分类卡实测高度，
-   让常见情况下两栏底边大致齐平，写死的数字，不随当前这页项目多少而变。
-   三个 class 叠起来是为了压过 AiAssistantWidget 自己 <style scoped> 里
-   .lk-ai-asst 规则编译后的 .lk-ai-asst[data-v-xxxx]——属性选择器和 class
-   同权重，只用一两个 class 覆盖不稳（见 ArticleIndexList.vue 同一处注释）。 */
+.lk-proj-side__sticky::-webkit-scrollbar {
+  display: none;
+}
+
+/* 最后一张卡（AI 问答）吃掉 sticky 容器里分类卡之外的剩余高度：三个 class
+   叠起来是为了压过 AiAssistantWidget 自己 <style scoped> 里 .lk-ai-asst
+   规则编译后的 .lk-ai-asst[data-v-xxxx]——属性选择器和 class 同权重，只用
+   一两个 class 覆盖不稳（见 ArticleIndexList.vue 同一处注释）。 */
 .lk-proj-side__sticky .lk-ai-asst.lk-proj-side__assistant {
-  min-height: 350px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ── 卡片壳：Notion/GitHub 左侧控制区风格 ── */
 .lk-proj-side__shell {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: 0.25rem;
   width: 100%;

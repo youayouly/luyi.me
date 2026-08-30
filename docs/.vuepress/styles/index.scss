@@ -8299,6 +8299,8 @@ html {
 
   .lk-article-three__left {
     position: static !important;
+    max-height: none !important;
+    overflow-y: visible !important;
     order: 1;
   }
 
