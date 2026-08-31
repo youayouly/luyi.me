@@ -117,6 +117,23 @@ function verdictOf(row) {
   return VISIT_VERDICTS[row && row.verdict] || { label: '未判定', cls: 'is-unknown' }
 }
 
+/*
+ * 只用来决定要不要在 IP 后面画个云朵角标，跟 lib/lk-ip-intel.js#isCloudOrg
+ * 同一份关键字——判定分数已经在服务端算好随 row.reasons 带过来了，这里不重算
+ * 分数，只是给眼睛一个比「悬停看 title」更快的信号。
+ */
+const CLOUD_ORG_RE =
+  /AMAZON|AWS|GOOGLE|MICROSOFT|AZURE|DIGITALOCEAN|DIGITAL OCEAN|OVH|HETZNER|LINODE|AKAMAI|ORACLE|ALIBABA|ALIYUN|TENCENT|VULTR|CLOUDFLARE|FASTLY|SCALEWAY|CONTABO|LEASEWEB|CHOOPA/i
+
+function ipTitle(row) {
+  if (!row || !row.org) return row && row.ip ? row.ip : ''
+  return `${row.ip}\nASN ${row.asn || '?'} · ${row.org}`
+}
+
+function isCloudIp(row) {
+  return Boolean(row && row.org && CLOUD_ORG_RE.test(row.org))
+}
+
 /* 悬停时把加减分的依据摊开，判定才有得核对，而不是一个凭空的标签。 */
 function verdictTitle(row) {
   const reasons = (row && row.reasons) || []
@@ -1096,7 +1113,9 @@ onUnmounted(() => {
               </span>
               <span :title="fmtPlace(row)">{{ fmtPlace(row) }}</span>
               <span :title="row.ua">{{ row.model || row.device }} · {{ row.os }} · {{ row.browser }}</span>
-              <span class="lk-visit-ip">{{ row.ip || '—' }}</span>
+              <span class="lk-visit-ip" :title="ipTitle(row)">
+                {{ row.ip || '—' }}<em v-if="isCloudIp(row)" class="lk-visit-cloud-badge" title="IP 属于云/主机托管商网段">☁</em>
+              </span>
             </div>
             <p v-if="!filteredVisits.length" class="lk-admin-note">
               {{ visitorLogLoading ? '读取中…' : visitorLog?.recent?.length ? '这个分类下没有记录。' : '还没有记录。' }}
@@ -1754,6 +1773,12 @@ onUnmounted(() => {
 .lk-visit-ip {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.64rem;
+}
+
+.lk-visit-cloud-badge {
+  margin-left: 2px;
+  font-style: normal;
+  opacity: 0.75;
 }
 
 [data-theme='light'] .lk-visit-table {

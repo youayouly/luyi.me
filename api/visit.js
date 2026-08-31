@@ -40,6 +40,7 @@ const crypto = require('crypto')
  */
 const { kvReady, kvCmd, kvPipeline } = require('../lib/lk-kv.js')
 const { clientIp, parseUa } = require('../lib/lk-ua.js')
+const { lookupAsn } = require('../lib/lk-ip-intel.js')
 
 /** 明细保留条数。Upstash 免费档按命令计费，定长列表让占用可预期。 */
 const LOG_MAX = 800
@@ -173,15 +174,33 @@ module.exports = async function handler(req, res) {
     const day = today()
     const nowIso = new Date().toISOString()
 
+    /*
+     * ASN/组织名是纯本地二分查找（lk-ip-intel.js），没有额外网络请求，
+     * 没配 MAXMIND_LICENSE_KEY 时 asnInfo 是 null，字段就是空字符串——
+     * 跟这个接口一贯的「没配就降级，不报错」是同一个态度。
+     */
+    const asnInfo = lookupAsn(ip)
+
+    /*
+     * canvas/WebGL 指纹（docs/.vuepress/utils/deviceFingerprint.js），32 位十六进制
+     * 或空。只用来在 lib/lk-visit-classify.js 里跟 lk:owner 登记过的哈希比对，
+     * 判定「是不是站长」——不参与 lk:visitors 画像、不参与 sessionKey 会话归并，
+     * 陌生访客的这个值不会被用来拼出可跨会话追踪的档案。
+     */
+    const fp = String(body.fp || '').slice(0, 64)
+
     const place = {
       ip,
       country: header(req, 'x-vercel-ip-country'),
       region: header(req, 'x-vercel-ip-country-region'),
       city: header(req, 'x-vercel-ip-city'),
+      asn: asnInfo ? asnInfo.asn : '',
+      org: asnInfo ? asnInfo.org : '',
       device,
       model,
       os,
       browser,
+      fp,
     }
 
     /*

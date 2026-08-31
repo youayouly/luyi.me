@@ -25,6 +25,7 @@
     "article:push": "node scripts/article.mjs push",
     "article:status": "node scripts/article.mjs status",
     "sync:stars": "node scripts/sync-starred.mjs",
+    "sync:ip-asn": "node scripts/sync-ip-asn.mjs",
     "sync:mirror": "node scripts/sync-public-mirror.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs"
   },
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@vuepress/bundler-vite": "^2.0.0-rc.28",
     "@vuepress/theme-default": "^2.0.0-rc.112",
+    "adm-zip": "^0.6.0",
     "sass-embedded": "^1.93.2",
     "stylus": "^0.64.0",
     "vuepress": "^2.0.0-rc.28",

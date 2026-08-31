@@ -165,6 +165,7 @@ Every file there sits outside `api/` and is pulled in by relative `require`, whi
 | `lk-admin-auth.js` | session issue/verify/renew, credential fallback, login log | login + every write endpoint |
 | `lk-ua.js` | `clientIp()` + `parseUa()` — device/OS/browser/bot from the UA, no npm dep | login, visit |
 | `lk-visit-classify.js` | `classifyVisits()` — human-vs-bot score per visit row | visitor-log |
+| `lk-ip-intel.js` | `lookupAsn()`/`isCloudOrg()` — local IP→ASN/org lookup, binary search over a generated table | visit, visit-classify |
 | `lk-markdown.js` | escape-first mini Markdown → safe HTML | guestbook |
 | `lk-guest.js` | nickname/contact cleanup, QQ + Gravatar avatars, email masking | guestbook |
 | `lk-mail.js` | Resend REST wrapper; no-ops without a key | guestbook |
@@ -176,11 +177,62 @@ first (the site sits behind Cloudflare, so `x-forwarded-for`'s first hop used to
 **CF edge node**, not the visitor — fixed; `x-real-ip` is the fallback, then
 `x-forwarded-for` for the no-Cloudflare case, e.g. local dev). `lk-visit-classify.js`
 still scores 0–100 (`HUMAN_MIN` 65 / `BOT_MAX` 35, 50 = no signal) from UA + region + path
-+ time and **deliberately ignores IP anyway**: even the real IP isn't stable enough to
-key a session on — mobile carriers rotate a phone's IP across towers within minutes, so
-grouping by IP would still split one visit into several. `/api/visitor-log` runs it over
-`recent` before responding, and `LoginGate.vue` only renders the verdict — change the
-scoring server-side, not in the component.
++ time and **deliberately ignores IP for session grouping**: even the real IP isn't
+stable enough to key a session on — mobile carriers rotate a phone's IP across towers
+within minutes, so grouping by IP would still split one visit into several. `/api/visitor-log`
+runs it over `recent` before responding, and `LoginGate.vue` only renders the verdict —
+change the scoring server-side, not in the component.
+
+One signal *does* use IP: `lib/lk-ip-intel.js#isCloudOrg()` checks whether the row's
+`org` (an ASN organization name, see below) matches a known cloud/hosting keyword list
+(AWS, GCP, Azure, DigitalOcean, OVH, Hetzner, …) and knocks `-25` off the score — this
+was added after manually spotting AWS us-east-1 / GCP us-central1 / DigitalOcean IPs
+hitting the homepage once each with rotating UAs, a classic scanner pattern the other
+signals didn't catch. `org`/`asn` are resolved once at write time in `api/visit.js`
+(`lookupAsn(ip)`, a synchronous local binary search — no per-visit network request) and
+stored on the row, not re-looked-up on every admin read.
+
+`lookupAsn()` is a **local table lookup, not a live API call**: `scripts/sync-ip-asn.mjs`
+(`npm run sync:ip-asn`) downloads MaxMind's free GeoLite2-ASN CSV (needs a free
+`MAXMIND_LICENSE_KEY`, see `.env.example`) and converts IPv4 CIDR blocks into a sorted
+`[start, end, asn, org]` array written to `lib/lk-ip-asn.generated.json` — same
+build-time-fetch-not-runtime-fetch pattern as `sync-starred.mjs`, chosen so `/api/visit`
+never gains a third-party network dependency or hands a visitor's IP to another service.
+**IPv4 only** for now (every scanner case found so far was IPv4; IPv6 coverage would
+roughly double the table for a personal-blog-scale benefit that isn't there yet). Without
+the key, the generated file doesn't exist and `lk-ip-intel.js` degrades to
+"nothing found" everywhere — same no-key-no-crash contract as every other optional
+integration. **The generated file must still be committed** once it exists (same reason
+as `lk-article-brief.generated.json`): it's `require()`d by `api/visit.js` at runtime,
+and `@vercel/nft` only bundles what it can trace on disk at deploy time. ASN block
+assignments drift, so re-run the sync every few months.
+
+`LoginGate.vue` shows a ☁ badge next to the IP (hover for `ASN <n> · <org>`) using its
+own copy of the same cloud-keyword regex — a display hint only, computed client-side
+from data already in the row; it doesn't re-score anything.
+
+**Device recognition also has a canvas/WebGL fingerprint now, deliberately scoped narrow.**
+`docs/.vuepress/utils/deviceFingerprint.js#getDeviceFingerprint()` hashes a canvas
+render + `WEBGL_debug_renderer_info` + a couple of hardware fields into one SHA-256
+(memoized per page session), sent as `fp` on every `/api/visit` call. This exists
+because the pre-existing `deviceKey()` match (device+model+os+browser) can't tell two
+iPhones apart at all — Safari's frozen UA gives it nothing to work with — and breaks on
+every iOS point release anyway, since the UA's OS string carries the version.
+canvas/WebGL fingerprints are tied to hardware/rendering pipeline, not a version string,
+so they usually survive OS updates that break `deviceKey()`.
+
+**The scope boundary that was explicitly chosen over full fingerprint tracking**
+(the `visitor-log-hardening-plan` memory says "canvas/字体指纹一律不做" — this reverses
+that, deliberately, after being asked twice and confirming the narrower scope): `fp`
+is written into `place` in `api/visit.js` so it rides along on both branches (the
+`lk:owner` record when `owner:true`, and the regular `lk:visits` row otherwise) —
+but it is **not** added to `profileField` (the `lk:visitors` HASH backing the "访客个体"
+tab) and **not** used in `sessionKey()`. A stranger's fingerprint sits in the same
+800-row rolling `lk:visits` log as their UA/IP already did, at the same retention, and
+is used for exactly one comparison — against `lk:owner`'s registered fingerprints — never
+aggregated into a persistent per-visitor identity the way `vid` is. `lib/lk-visit-classify.js`
+checks `row.fp` against the owner set before falling back to `deviceKey()`, so a fingerprint
+match wins when both are available.
 
 **Those `require('../lib/…')` paths are written relative to the
 *generated* `api/` copy, not to `docs/api/` where the source lives** — `docs/api/` is
@@ -530,6 +582,7 @@ of a request that will only 503.
 - `scripts/sync-article-readme-to-github.mjs` - Syncs README with GitHub
 - `scripts/gen-china-outline.mjs` - Generates China map outline data for `VisitedChinaFootprints`
 - `scripts/sync-starred.mjs` (`npm run sync:stars`) - Pulls a GitHub user's starred repos at build time into `data/starredRepos.generated.js` (`StarredRepos.vue`), same reason as the external-project sync below: runtime `fetch` would miss the pretranslate scan and burn the anonymous 60/hr GitHub rate limit per visitor
+- `scripts/sync-ip-asn.mjs` (`npm run sync:ip-asn`) - Downloads MaxMind's GeoLite2-ASN CSV into `lib/lk-ip-asn.generated.json` for the visitor-log bot signal (see **Visitor log** below); needs `MAXMIND_LICENSE_KEY`, skips quietly without it
 - `scripts/sync-external-projects.mjs` / `scripts/onboard-external-project.mjs` - External project sync (see below)
 - `scripts/sync-article-index.mjs` (`npm run sync:articles`, `--check` variant) - Generates `docs/.vuepress/data/articleIndex.generated.js` from `docs/article/*.md` frontmatter; runs automatically before `dev`/`build`. See *Article index* below.
 - `scripts/check-publish.mjs` (`npm run check`) - Diffs local vs `origin/main` article files and counts; use when a publish appears to have half-landed
@@ -639,6 +692,7 @@ one into a file outside `.env.local` — the API routes read everything from `pr
 - `DIFY_API_URL` / `DIFY_API_KEY` - For AI cover generation
 - `SILICONFLOW_API_KEY` - Also powers `/api/translate-page` (required for the page translation toggle)
 - `KV_REST_API_URL` / `KV_REST_API_TOKEN` - Upstash Redis, injected by the Vercel Marketplace integration. Backs the admin session and the visitor log. `UPSTASH_REDIS_REST_URL` / `_TOKEN` are accepted as aliases. Without them `/api/login` returns 503 and `/api/visit` silently no-ops.
+- `MAXMIND_LICENSE_KEY` - Only read by `scripts/sync-ip-asn.mjs` (`npm run sync:ip-asn`), never at runtime. Free key from MaxMind, regenerates `lib/lk-ip-asn.generated.json`. Not needed on Vercel.
 - `TRANSLATE_MODEL` - Override the translation model (default `Qwen/Qwen3-30B-A3B-Instruct-2507`; avoid thinking-mode models, they are ~10x slower)
 - `LK_ASSISTANT_MODEL` - Override the model `/api/assistant` uses, independent of `TRANSLATE_MODEL` (falls back to it, then the same default). Reuses `TRANSLATE_API_BASE`/`TRANSLATE_API_KEY` for the provider.
 - `TRANSLATE_API_BASE` / `TRANSLATE_API_KEY` - Point translation at a different OpenAI-compatible provider
