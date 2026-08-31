@@ -152,6 +152,7 @@ Endpoints:
 - `/api/visit` - Public; records one visit into Redis. See **Visitor log** below.
 - `/api/visitor-log` - Admin-only; reads the visit log and counters.
 - `/api/guestbook` - Public read/write for the guestbook, admin-only delete. See **Guestbook** below.
+- `/api/assistant` - Public; sidebar AI chat widget. See **AI Assistant Widget** below.
 
 **Shared server code lives in `lib/`, not `docs/api/`.** Every file in `api/` becomes a
 Serverless Function, so a helper placed there would deploy as a handler-less function.
@@ -167,14 +168,19 @@ Every file there sits outside `api/` and is pulled in by relative `require`, whi
 | `lk-markdown.js` | escape-first mini Markdown → safe HTML | guestbook |
 | `lk-guest.js` | nickname/contact cleanup, QQ + Gravatar avatars, email masking | guestbook |
 | `lk-mail.js` | Resend REST wrapper; no-ops without a key | guestbook |
+| `lk-assistant-context.js` | `buildSystemPrompt()` — site blurb + article briefs, light grounding | assistant |
 
 `lk-ua.js`'s header documents what model detection *cannot* do (frozen iOS UA, Chrome
-≥110 Android UA reduction) so nobody re-litigates it. `lk-visit-classify.js` scores
-0–100 (`HUMAN_MIN` 65 / `BOT_MAX` 35, 50 = no signal) from UA + region + path + time
-and **deliberately ignores IP**: the site is behind Cloudflare, so `clientIp()` returns
-the CF edge node and one phone hops between edge IPs within minutes. `/api/visitor-log`
-runs it over `recent` before responding, and `LoginGate.vue` only renders the verdict —
-change the scoring server-side, not in the component.
+≥110 Android UA reduction) so nobody re-litigates it. `clientIp()` reads `cf-connecting-ip`
+first (the site sits behind Cloudflare, so `x-forwarded-for`'s first hop used to be the
+**CF edge node**, not the visitor — fixed; `x-real-ip` is the fallback, then
+`x-forwarded-for` for the no-Cloudflare case, e.g. local dev). `lk-visit-classify.js`
+still scores 0–100 (`HUMAN_MIN` 65 / `BOT_MAX` 35, 50 = no signal) from UA + region + path
++ time and **deliberately ignores IP anyway**: even the real IP isn't stable enough to
+key a session on — mobile carriers rotate a phone's IP across towers within minutes, so
+grouping by IP would still split one visit into several. `/api/visitor-log` runs it over
+`recent` before responding, and `LoginGate.vue` only renders the verdict — change the
+scoring server-side, not in the component.
 
 **Those `require('../lib/…')` paths are written relative to the
 *generated* `api/` copy, not to `docs/api/` where the source lives** — `docs/api/` is
@@ -483,6 +489,39 @@ owner spoofing, delete auth, threading). The XSS round asserts against a **tag a
 rather than searching for dangerous substrings — escaped text legitimately contains
 `onload=`, and a substring check flags that as a leak.
 
+### AI Assistant Widget
+
+`AiAssistantWidget.vue` (a chat card, not a global component — it's locally `import`ed
+into whichever page embeds it: `AboutMePage.vue`, `ArticleIndexList.vue`,
+`ProjectsSidebarFilters.vue`, `GuestbookBoard.vue`) plus `docs/api/assistant.js`. No
+login, no per-visitor storage: chat history lives only in the component's own `ref`
+for that page session and is sent back in full on every turn (`sanitizeHistory()`
+server-side caps it to the last `MAX_HISTORY_TURNS`/`MAX_HISTORY_CHARS`) — there is no
+vid/cooldown bookkeeping because nothing is persisted.
+
+The endpoint calls the same SiliconFlow `chat/completions` provider as
+`translate-page.js` (`TRANSLATE_API_BASE`/`TRANSLATE_API_KEY`, override model via
+`LK_ASSISTANT_MODEL` else `TRANSLATE_MODEL`). Grounding is a system prompt, not a vector
+store: `lib/lk-assistant-context.js#buildSystemPrompt()` concatenates a hand-written
+zh/en site blurb with every article's title/excerpt/tags/href, capped at
+`MAX_ARTICLES` (40) — small enough article count that full-context beats retrieval. It
+reads `lib/lk-article-brief.generated.json`, a second, smaller sibling of
+`articleIndex.generated.js` written by the same `scripts/sync-article-index.mjs`
+(**not gitignored — commit it like the other generated file**). It exists separately
+because `docs/api/assistant.js` is CommonJS and `articleIndex.generated.js` is
+`export const` ESM — Node's default loader can't `require()` that without
+`"type": "module"`, but a `.json` file has no module-format problem.
+
+Gates mirror `guestbook.js`, cheapest first — same-site `Origin`/`Referer` (missing
+both = 403) → bot UA (silently `{ok:true, skipped:'bot'}`, no spend) → per-IP rate
+limit (`RATE_MAX` 12 / 10min, looser than the guestbook's 5/10min since a real
+conversation is several turns). **Unlike `/api/visit`, an unconfigured KV store fails
+closed with a real 503** instead of silently no-opping — without Upstash there is no
+rate limit, and a rate-limit-free endpoint in front of a paid model is an open
+proxy anyone could burn quota through. `GET /api/assistant` reports
+`{configured: Boolean(key) && kvReady()}` so the widget can show "AI 助手暂未配置" instead
+of a request that will only 503.
+
 ### Key Scripts:
 - `scripts/copy-api.mjs` - Copies API files to root for Vercel deployment
 - `scripts/pretranslate.mjs` - Build-time pre-translation; runs after `vuepress build` (wired into `npm run build`). Scans `docs/.vuepress/dist/**/*.html`, extracts unique CJK text nodes via `scripts/lib/html-text-nodes.mjs`, translates only the ones missing from the dictionary, writes `docs/.vuepress/public/i18n/en.json` (committed) and mirrors it into `dist/`. It then **rewrites the built HTML into English** and inlines the reverse map (see *First-paint translation*). No API key -> logs and skips translating, never fails the build, so Vercel ships the committed dictionary without burning quota — the HTML rewrite still runs, since it only needs the dictionary.
@@ -490,6 +529,7 @@ rather than searching for dangerous substrings — escaped text legitimately con
 - `scripts/push.mjs` - Git push utility with commit message formatting
 - `scripts/sync-article-readme-to-github.mjs` - Syncs README with GitHub
 - `scripts/gen-china-outline.mjs` - Generates China map outline data for `VisitedChinaFootprints`
+- `scripts/sync-starred.mjs` (`npm run sync:stars`) - Pulls a GitHub user's starred repos at build time into `data/starredRepos.generated.js` (`StarredRepos.vue`), same reason as the external-project sync below: runtime `fetch` would miss the pretranslate scan and burn the anonymous 60/hr GitHub rate limit per visitor
 - `scripts/sync-external-projects.mjs` / `scripts/onboard-external-project.mjs` - External project sync (see below)
 - `scripts/sync-article-index.mjs` (`npm run sync:articles`, `--check` variant) - Generates `docs/.vuepress/data/articleIndex.generated.js` from `docs/article/*.md` frontmatter; runs automatically before `dev`/`build`. See *Article index* below.
 - `scripts/check-publish.mjs` (`npm run check`) - Diffs local vs `origin/main` article files and counts; use when a publish appears to have half-landed
@@ -600,6 +640,7 @@ one into a file outside `.env.local` — the API routes read everything from `pr
 - `SILICONFLOW_API_KEY` - Also powers `/api/translate-page` (required for the page translation toggle)
 - `KV_REST_API_URL` / `KV_REST_API_TOKEN` - Upstash Redis, injected by the Vercel Marketplace integration. Backs the admin session and the visitor log. `UPSTASH_REDIS_REST_URL` / `_TOKEN` are accepted as aliases. Without them `/api/login` returns 503 and `/api/visit` silently no-ops.
 - `TRANSLATE_MODEL` - Override the translation model (default `Qwen/Qwen3-30B-A3B-Instruct-2507`; avoid thinking-mode models, they are ~10x slower)
+- `LK_ASSISTANT_MODEL` - Override the model `/api/assistant` uses, independent of `TRANSLATE_MODEL` (falls back to it, then the same default). Reuses `TRANSLATE_API_BASE`/`TRANSLATE_API_KEY` for the provider.
 - `TRANSLATE_API_BASE` / `TRANSLATE_API_KEY` - Point translation at a different OpenAI-compatible provider
 - `LK_MAIL_TO` - Where "someone left a message" mails go. Unset = not sent; reply reminders to visitors are unaffected.
 - `RESEND_API_KEY` / `LK_MAIL_FROM` - Guestbook reply notifications. Unset = the address is stored and nothing is sent; a message never fails because mail failed.
