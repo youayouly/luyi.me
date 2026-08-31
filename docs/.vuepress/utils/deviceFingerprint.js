@@ -14,7 +14,8 @@
  * 里、跟 UA/设备信息一个待遇，不会被单独聚合。
  */
 
-let cached = null
+let cachedPromise = null
+let cachedValue = ''
 
 function canvasSignal() {
   try {
@@ -80,8 +81,24 @@ async function compute() {
   }
 }
 
-/** 一次页面会话只算一次，后续访问直接复用——canvas/WebGL 读取有真实开销。 */
+/*
+ * 同步读取，绝不 await——上报走 sendBeacon，必须在触发它的那个事件回调里
+ * 原样同步调用，不能被任何异步操作（哪怕只是几毫秒的 canvas/WebGL/哈希计算）
+ * 插在中间。之前 reportVisit 里 `await` 过这个值，实测在 Safari 上一旦不是
+ * 首次整页加载（而是 SPA 内部路由跳转），beacon 经常直接发不出去——具体是
+ * WebKit 哪一层的限制没深挖，但「同步调用」本来就是 sendBeacon 唯一被保证
+ * 可靠的用法，没理由为了指纹字段去冒这个险。
+ *
+ * 所以这里只负责在后台把计算跑起来、缓存结果；第一次调用时大概率还没算完，
+ * 拿到的是空字符串，那次上报就没有指纹——一次会话里后续的每次导航都会命中
+ * 缓存，绝大多数访问仍然带得上。
+ */
 export function getDeviceFingerprint() {
-  if (!cached) cached = compute()
-  return cached
+  if (!cachedPromise) {
+    cachedPromise = compute().then((v) => {
+      cachedValue = v
+      return v
+    })
+  }
+  return cachedValue
 }

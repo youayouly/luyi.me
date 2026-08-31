@@ -34,7 +34,7 @@ function isLocalHost() {
  * @param {string} path 当前路由路径
  * @param {{ owner?: boolean }} [opts] owner=true 表示这是站长自己（后台会标出来）
  */
-export async function reportVisit(path, opts = {}) {
+export function reportVisit(path, opts = {}) {
   if (typeof window === 'undefined') return
   // 本地开发不往线上库里灌脏数据。
   if (isLocalHost()) return
@@ -44,10 +44,12 @@ export async function reportVisit(path, opts = {}) {
   lastPath = clean
 
   /*
-   * await 不会拖慢跳转本身——这是路由跳转*之后*的上报，不在导航路径上。
-   * 指纹只在一次页面会话里首次调用时真正计算，后面全是缓存的 Promise。
+   * 同步读取，不 await——见 deviceFingerprint.js 头注释：sendBeacon 必须留在
+   * 触发它的这个同步调用链里，中间插一次 await 在 Safari 上会导致后续的
+   * SPA 内部跳转经常发不出这次上报（首次整页加载不受影响，因为那次本来就
+   * 有更宽松的时间窗）。指纹算好之前的头几次访问会没有 fp，之后自然补上。
    */
-  const fp = await getDeviceFingerprint()
+  const fp = getDeviceFingerprint()
 
   const payload = JSON.stringify({
     path: clean,
