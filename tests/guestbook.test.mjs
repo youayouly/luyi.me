@@ -478,6 +478,39 @@ await test('地区只到省 / 国家，城市和 IP 不外吐', async () => {
   assert.ok(!dump.includes('203.0.113'), 'IP 泄漏了')
 })
 
+await test('挂在 Cloudflare 后面时，地区以 cf-ipcountry 为准', async () => {
+  /*
+   * 站点在 CF 后面，Vercel 看到的对端是 CF 边缘节点，x-vercel-ip-* 描述的是那个
+   * 节点 —— 2026-09-10 站长人在新加坡，留言旁边写的是「日本」。CF 自己是按
+   * cf-connecting-ip 算的，所以 cf-ipcountry 在就以它为准；国家对不上时，
+   * Vercel 那份省份讲的是别的国家，一并丢掉。
+   */
+  await call({
+    method: 'POST',
+    body: { nick: '新加坡路人', content: '你好' },
+    headers: {
+      'cf-connecting-ip': '203.0.113.77',
+      'cf-ipcountry': 'SG',
+      'x-vercel-ip-country': 'JP',
+      'x-vercel-ip-country-region': '13',
+      'x-vercel-ip-city': 'Tokyo',
+    },
+  })
+
+  const one = await call({ method: 'GET' })
+  assert.deepEqual(one.payload.items[0].place, { country: 'SG', region: '' })
+
+  /* 没有 cf-ipcountry（直连 Vercel / zone 没开地理定位）时原样退回旧行为 */
+  reset()
+  await call({
+    method: 'POST',
+    body: { nick: '广东路人', content: '你好' },
+    headers: { 'x-vercel-ip-country': 'CN', 'x-vercel-ip-country-region': 'GD' },
+  })
+  const two = await call({ method: 'GET' })
+  assert.deepEqual(two.payload.items[0].place, { country: 'CN', region: 'GD' })
+})
+
 await test('没配 LK_MAIL_TO 时站长通知安静跳过', async () => {
   delete process.env.LK_MAIL_TO
   const res = await call({ method: 'POST', body: { nick: '甲', content: '有人来了', ...creds } })

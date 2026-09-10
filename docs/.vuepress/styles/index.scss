@@ -2421,7 +2421,11 @@ main.vp-page:has(.lk-proj-hub-fullbleed) .vp-page-title {
   flex: none;
   overflow: visible;
   box-sizing: border-box;
-  padding-top: 0.35rem;
+  /* 导航栏与首张卡片之间的呼吸位。1.5rem 是抄的另外两个同构页面：
+     /guestbook 的 .lk-gb-page（24px）和 /article 的 .lk-article-three__content
+     （1.55rem）——这三页共用「窄侧栏 + 高主列」的骨架，顶部间距不该只有这页
+     贴着导航栏。原值 0.35rem 只留了 6px，卡片几乎顶到分隔线上。 */
+  padding-top: 1.5rem;
 }
 
 .lk-proj-hub-layout__portfolio {

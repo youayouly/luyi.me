@@ -46,6 +46,7 @@ const { verifyAdmin } = require('../lib/lk-admin-auth.js')
 const { MAX_CHARS, renderMarkdown, toPlainText } = require('../lib/lk-markdown.js')
 const { cleanNick, maskEmail, newId, parseContact } = require('../lib/lk-guest.js')
 const { mailReady, sendMail } = require('../lib/lk-mail.js')
+const { resolvePlace } = require('../lib/lk-geo.js')
 
 const LIST_KEY = 'lk:gb'
 /** 表情回应：计数放一个 HASH，字段是 `<留言id>:<表情>`。 */
@@ -71,17 +72,6 @@ const RATE_WINDOW_SEC = 10 * 60
 /** 同一台设备两次发言的最小间隔。 */
 const COOLDOWN_SEC = 30
 const NICK_MIN = 1
-
-/** Vercel 的 x-vercel-ip-* 是 URI 编码过的，解不开就用原值。 */
-function header(req, name) {
-  const raw = req.headers[name]
-  if (!raw) return ''
-  try {
-    return decodeURIComponent(String(raw)).slice(0, 40)
-  } catch {
-    return String(raw).slice(0, 40)
-  }
-}
 
 function hostOf(url) {
   try {
@@ -530,6 +520,8 @@ module.exports = async function handler(req, res) {
       verified = true
     }
 
+    const place = resolvePlace(req)
+
     const row = {
       id: newId(),
       at: new Date().toISOString(),
@@ -554,9 +546,12 @@ module.exports = async function handler(req, res) {
       /*
        * 只留国家 / 省两级，**不存城市**：留言旁边显示「来自 广东」够了，
        * 精确到城市对访客来说是被盯着的感觉，对站长也没多大用。
+       *
+       * 走 lk-geo.js 而不是直接读 x-vercel-ip-*：站点在 Cloudflare 后面，
+       * 那组头描述的是 CF 边缘节点，人在新加坡会被写成「日本」。
        */
-      country: header(req, 'x-vercel-ip-country'),
-      region: header(req, 'x-vercel-ip-country-region'),
+      country: place.country,
+      region: place.region,
     }
 
     await kvPipeline([

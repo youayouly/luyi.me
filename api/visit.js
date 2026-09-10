@@ -13,7 +13,8 @@
  * 访客 id = sha256(IP + UA) 前 16 位。同一台设备同一个网络下稳定，
  * 既能算「用户个体」，又不用往访客浏览器里塞追踪 cookie。
  *
- * 地理信息直接用 Vercel 边缘注入的 x-vercel-ip-* 头，不额外调第三方。
+ * 地理信息只读请求头，不额外调第三方：先 Cloudflare 的 cf-ipcountry（按真实访客 IP
+ * 算的），再退回 Vercel 的 x-vercel-ip-*。为什么不能反过来，见 lib/lk-geo.js。
  *
  * ## 这个接口是公开的，所以有三道闸门
  *
@@ -41,6 +42,7 @@ const crypto = require('crypto')
 const { kvReady, kvCmd, kvPipeline } = require('../lib/lk-kv.js')
 const { clientIp, parseUa } = require('../lib/lk-ua.js')
 const { lookupAsn } = require('../lib/lk-ip-intel.js')
+const { resolvePlace } = require('../lib/lk-geo.js')
 
 /** 明细保留条数。Upstash 免费档按命令计费，定长列表让占用可预期。 */
 const LOG_MAX = 800
@@ -65,16 +67,6 @@ const VISITOR_MAX = 5000
  * 只在这个 HASH 里留「每台设备一行、原地更新」，所以手机 + 电脑撑死两三行。
  */
 const OWNER_MAX = 6
-
-function header(req, name) {
-  const raw = req.headers[name]
-  if (!raw) return ''
-  try {
-    return decodeURIComponent(String(raw))
-  } catch {
-    return String(raw)
-  }
-}
 
 function today() {
   // 站点面向国内，按东八区切天，跟不蒜子的直觉一致。
@@ -189,11 +181,18 @@ module.exports = async function handler(req, res) {
      */
     const fp = String(body.fp || '').slice(0, 64)
 
+    /*
+     * 地理位置走 lk-geo.js：站点在 Cloudflare 后面，x-vercel-ip-* 描述的是
+     * CF 边缘节点而不是访客（2026-08-31 见过 CF 节点被标成 US，
+     * 2026-09-10 站长人在新加坡被标成日本），要先让 cf-ipcountry 说话。
+     */
+    const geo = resolvePlace(req, { withCity: true })
+
     const place = {
       ip,
-      country: header(req, 'x-vercel-ip-country'),
-      region: header(req, 'x-vercel-ip-country-region'),
-      city: header(req, 'x-vercel-ip-city'),
+      country: geo.country,
+      region: geo.region,
+      city: geo.city,
       asn: asnInfo ? asnInfo.asn : '',
       org: asnInfo ? asnInfo.org : '',
       device,

@@ -1,9 +1,11 @@
 /**
  * 地区代码 → 人话，中英两份。
  *
- * 留言板上的「来自 广东」就是查这张表。数据来自 Vercel 边缘注入的
- * `x-vercel-ip-country`（ISO 3166-1 alpha-2）和 `x-vercel-ip-country-region`
- * （ISO 3166-2 的省级代码，不带国家前缀）。
+ * 留言板上的「来自 广东」就是查这张表。代码由服务端的 `lib/lk-geo.js#resolvePlace()`
+ * 给出：国家是 ISO 3166-1 alpha-2，省级是 ISO 3166-2 的下级代码（不带国家前缀）。
+ * 优先来自 Cloudflare（`cf-ipcountry` / `cf-region-code`，按真实访客 IP 算的），
+ * 拿不到才退回 Vercel 的 `x-vercel-ip-*`——站点在 CF 后面时那组头描述的是边缘节点，
+ * 人在新加坡会被写成日本，原委见 lib/lk-geo.js 顶部。
  *
  * 为什么带英文：地区是**运行时**数据，永远进不了构建期词典（`pretranslate.mjs`
  * 只扫构建产物里的中文），交给运行时翻译接口既慢又会把「广东」翻成奇怪的东西。
