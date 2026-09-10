@@ -128,6 +128,25 @@ function readBody(req) {
   return req.body || {}
 }
 
+/**
+ * 按访客**这条消息本身**的语言决定回复语言：打中文就用中文答、打英文就用英文答。
+ *
+ * 不能用前端传来的 `body.lang`——那是站点界面语言（`pageLang`），本站默认发英文 HTML，
+ * 于是 `pageLang` 恒为 `en`，中文提问也被判成英文、回英文（就是截图里那个现象）。
+ * 界面语言只当兜底：消息里没有任何字母/汉字可判（纯标点、表情、数字）时才回退到它。
+ *
+ * 判定：数一下汉字和拉丁字母各有多少。有汉字、且汉字不至于被大段英文淹没（cjk*3 >= latin）
+ * 就算中文——这样「mostly 英文里夹一个中文书名」仍判英文，整句中文判中文。
+ */
+function detectLang(message, fallback) {
+  const text = String(message || '')
+  const cjk = (text.match(/[㐀-鿿豈-﫿]/g) || []).length
+  const latin = (text.match(/[a-zA-Z]/g) || []).length
+  if (cjk === 0 && latin === 0) return fallback === 'zh' ? 'zh' : 'en'
+  if (cjk > 0 && cjk * 3 >= latin) return 'zh'
+  return 'en'
+}
+
 /** 只留 user/assistant 两种角色，裁到最近 N 轮、总字数封顶——防止前端传一份超长历史。 */
 function sanitizeHistory(raw) {
   if (!Array.isArray(raw)) return []
@@ -244,7 +263,8 @@ module.exports = async function handler(req, res) {
       return res.status(413).json({ ok: false, error: `单条消息最多 ${MAX_MESSAGE_CHARS} 字` })
     }
 
-    const lang = body.lang === 'zh' ? 'zh' : 'en'
+    // 回复语言跟着这条消息走，不跟界面语言走；消息无从判断时才用界面语言兜底。
+    const lang = detectLang(message, body.lang)
     const history = sanitizeHistory(body.history)
 
     const { reply, model } = await askAssistant({ message, history, lang })
