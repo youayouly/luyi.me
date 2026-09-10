@@ -155,23 +155,34 @@
       </p>
     </section>
 
-    <!-- 访客留言：跟下面那份分开放的占位卡——下面那份现在还是测试数据，
-         真实访客来留言之前先用这张空状态卡片占住位置，纯展示，不接数据。 -->
-    <section class="lk-gb__list">
-      <h2 class="lk-gb__list-title">{{ isEnglish ? '💬 Visitor Comments' : '💬 访客留言' }}</h2>
-      <p class="lk-gb__state">
-        {{ isEnglish ? 'No visitor comments yet — write the first one!' : '还没有访客留言，来写第一条吧。' }}
-      </p>
-    </section>
-
-    <!-- 测试留言：跟发送框同一栏，目前是开发期留的测试数据（Zephyr / octocat 那些
-         带 [TEST] 前缀的），不是真实访客发的。 -->
+    <!-- 上：真实访客留言。
+         这里以前是「一张写死的空状态占位卡 + 一份叫『测试留言』的真实列表」，
+         占位卡永远显示「还没有访客留言」，真访客的留言却挂在「测试留言」标题下
+         （2026-09-10 tyrosine 那条就是这么跑偏的）。占位卡删了，真列表拿回这个标题。 -->
     <GuestbookThreadList
-      :title="isEnglish ? '💬 Test Comments' : '💬 测试留言'"
-      :threads="publicThreads"
+      :title="isEnglish ? '💬 Visitor Comments' : '💬 访客留言'"
+      :threads="realThreads"
       :loading="loading"
       :load-error="loadError"
-      :empty-text="isEnglish ? 'No public comments yet.' : '还没有公开留言，来写第一条。'"
+      :empty-text="isEnglish ? 'No visitor comments yet — write the first one!' : '还没有访客留言，来写第一条吧。'"
+      :is-logged-in="isLoggedIn"
+      :avatar-of="avatarOf"
+      :initial="initial"
+      :place-of="placeOf"
+      :format-date="formatDate"
+      :has-reacted="hasReacted"
+      :failed-avatars="failedAvatars"
+      @react="react"
+      @reply="startReply"
+      @remove="remove"
+    />
+
+    <!-- 下：开发期留在线上的测试数据（见 isTestThread）。留着不删，只是别跟真人混在一栏。
+         测试行删光后 v-if 让整块消失，不会剩一张空的「测试留言」卡。 -->
+    <GuestbookThreadList
+      v-if="testThreads.length"
+      :title="isEnglish ? '💬 Test Comments' : '💬 测试留言'"
+      :threads="testThreads"
       :is-logged-in="isLoggedIn"
       :avatar-of="avatarOf"
       :initial="initial"
@@ -362,6 +373,25 @@ const threads = computed(() => {
  * 这类行（api/guestbook.js 的 private 处理没动，只是前端先不暴露入口）。
  */
 const publicThreads = computed(() => threads.value.filter((top) => !top.private))
+
+/*
+ * 开发期在线上留的测试留言（Zephyr / octocat 那两条）不删，但要跟真人分开：
+ * 混在一栏会让人以为站里没来过真访客，也让「访客留言」这个标题名不副实。
+ * 约定：正文以 [TEST] 开头的算测试数据——过去写那两条时就是这么打的前缀，
+ * 以后想再测直接沿用这个前缀即可，不用回来改代码。
+ *
+ * 按**顶层 thread** 分，不按单条留言分：回复永远跟着它的父留言走，
+ * 站长回真访客的那条不会被拆到测试栏里去（和当初 private 分栏一个道理）。
+ */
+function isTestThread(top) {
+  const text = String(top.html || '')
+    .replace(/<[^>]*>/g, '')
+    .trim()
+  return /^\[TEST\]/i.test(text)
+}
+
+const realThreads = computed(() => publicThreads.value.filter((top) => !isTestThread(top)))
+const testThreads = computed(() => publicThreads.value.filter(isTestThread))
 
 function say(text, bad = false) {
   notice.value = text

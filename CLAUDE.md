@@ -16,9 +16,16 @@ npm run article       # Article CLI: `new` | `list` | `status` | `push`
                       # (`article:new` / `article:status` / `article:push` are shortcuts)
 npm run check         # Compare local vs origin/main article state (debug publish drift)
 npm run push          # Commit + push with formatted message
+npm run sync:mirror   # THE RELEASE STEP: copy file state to the public repo (see below)
+npm run scan:secrets  # Scan every tracked file for keys (`--all`); also a pre-commit hook
+
+npm run sync:articles       # Regenerate data/articleIndex.generated.js from frontmatter
+npm run sync:articles:check # ...and `--check` it without writing (both run inside dev/build)
 npm run sync:projects # Pull external repos' blog-project.json into project cards
 npm run onboard:project # Scaffold a new external project into the registry
 npm run sync:article-readme # Push docs/article/README.md to GitHub on its own
+npm run sync:stars    # Pull starred repos into data/starredRepos.generated.js
+npm run sync:ip-asn   # Rebuild lib/lk-ip-asn.generated.json (needs MAXMIND_LICENSE_KEY)
 
 npm run gen:china-map   # Regenerate chinaMapOutline.generated.js
 npm run gen:proj-cover  # Generate project cover images
@@ -26,9 +33,16 @@ npm run gen:about-hero  # Generate the about-page hero image
 npm run test:siliconflow-cover # One-off probe of the cover-image provider
 ```
 
-`build` is three steps in one: `copy-api.mjs` → `vuepress build --clean-cache
---clean-temp` (with `--max-old-space-size=8192`) → `pretranslate.mjs`. A bare
-`vuepress build` skips both the API copy and the English HTML rewrite.
+`build` is four steps in one: `copy-api.mjs` → `sync-article-index.mjs` →
+`vuepress build --clean-cache --clean-temp` (with `--max-old-space-size=8192`) →
+`pretranslate.mjs`. `dev` runs the first two as well. A bare `vuepress build` skips
+the API copy, the article-index regeneration *and* the English HTML rewrite.
+
+Scripts in `scripts/` with **no npm alias** are one-off/legacy and not part of any
+pipeline: `gen-world-outline.mjs` (regenerates `worldMapOutline.generated.js` for
+`VisitedChinaFootprints`, the world half of the map — the China half has an alias),
+`sync-tech-article-bodies.mjs` (merges `/article/` bodies into `/tech/` wrapper pages),
+`gen-pm-covers.mjs`, `generate-cover.mjs`, and the `test-*.mjs` probes.
 
 ### Tests
 
@@ -46,10 +60,12 @@ code patterns are still present. They do not render anything. Consequence: renam
 read the assertion message, then either restore the invariant or update the test
 deliberately. Run all four `about-*` / `github-*` ones after any about-page/mobile layout change.
 
-Two of the files are not layout guards: `admin-session-visitor-log.test.mjs` actually runs
-`api/*.js` against an in-memory fake of the Upstash REST endpoint, and
+Three of the seven are not layout guards. `admin-session-visitor-log.test.mjs` and
+`guestbook.test.mjs` actually run `api/*.js` against an in-memory fake of the Upstash
+REST endpoint (the guestbook one is 21 cases — see *Guestbook* below);
 `i18n-first-paint.test.mjs` mixes real calls into `scripts/lib/` with source-text guards on
-the runtime translator. Run those after touching auth/visitor endpoints or the i18n pipeline.
+the runtime translator. Run those after touching auth/visitor/guestbook endpoints or the
+i18n pipeline.
 
 ## Architecture Overview
 
@@ -57,13 +73,28 @@ the runtime translator. Run those after touching auth/visitor endpoints or the i
 
 **Directory Structure**:
 - `docs/` - Markdown content (pages are auto-routed from file paths)
+- `docs/.vuepress/site.config.js` - **Site identity, and the only file a fork should need to edit** (see below)
 - `docs/.vuepress/components/` - Vue components registered globally via `client.js`
 - `docs/.vuepress/composables/` - Shared reactive state (e.g. `useProjectsHub` for cross-component role filtering)
 - `docs/.vuepress/data/` - Static data files (e.g. `projectsCatalog.js`, `projectRoles.js`)
 - `docs/.vuepress/utils/` - Shared utilities (auth, preferences, avatar, navigation)
-- `docs/.vuepress/styles/` - Global SCSS (`index.scss` + `palette.scss`)
+- `docs/.vuepress/styles/` - Global SCSS. `index.scss` is **~8.6k lines** and holds
+  essentially all of it; `palette.scss` is one line (`$theme-color`), and
+  `tech-detail-layout.scss` is `@import`ed from the bottom of `index.scss`. Look in
+  `index.scss` first — the other two names suggest more separation than exists.
 
 **Key Patterns**:
+
+0. **`site.config.js` is the identity layer.** `title` / `description` / `domain` /
+   `repo` / `avatar` (also the favicon and Hope logo) / `author` (github, email, wechat,
+   …) / `onlineSince` / the navbar array / the Cloudflare Analytics token all live in
+   `docs/.vuepress/site.config.js` and are read by `config.js` at build time *and* by
+   browser-side code (`navPrefs.js`, components) via `import`. It sits inside
+   `docs/.vuepress/` rather than the repo root deliberately: it must be under the Vite
+   root or the client import trips `server.fs.allow`. Change site identity here, not in
+   `config.js`. Nothing secret goes in it — keys are `process.env` only.
+   The Cloudflare beacon `<script>` is only injected when `analytics.cloudflareToken` is
+   non-empty (currently empty = not enabled).
 
 1. **Client Entry** (`docs/.vuepress/client.js`): Registers root components and handles route-based logic including Live2D widget, scroll effects, home page enhancements, and route-to-hash scrolling. Uses `defineClientConfig` with `rootComponents` array for site-wide Vue components. Key behaviors:
    - `scrollToRouteHash()` — ensures navigation to hash anchors (e.g. `/about#about-intro`) scrolls correctly
@@ -81,7 +112,8 @@ the runtime translator. Run those after touching auth/visitor endpoints or the i
    - `__LK_TECH_COUNT__` - Tech/project page count
    - `__LK_BUILD_TIME_ISO__` - Build timestamp
    - `__LK_SITE_YEAR__` - Current year for footer
-   - `__LK_SITE_ONLINE_SINCE_ISO__` - Site launch date for "running X days" footer (default or `LK_SITE_ONLINE_SINCE` env var)
+   - `__LK_SITE_ONLINE_SINCE_ISO__` - Site launch date for "running X days" footer (`LK_SITE_ONLINE_SINCE` env var, else `siteConfig.onlineSince`)
+   - `__LK_PUBLISH_API_URL__` - `LK_PUBLISH_API_URL` or `''`; lets the publish widget target a non-default API host
 
 4. **`config.js` page plugins** (VuePress `extendsPage`, not documented anywhere else):
    - `pagePatterns` excludes `agents/**`, `skills/**`, `*_backup.md`, `test-*.md`.
@@ -108,11 +140,30 @@ the runtime translator. Run those after touching auth/visitor endpoints or the i
    - Components use scoped styles with `<style scoped>`
 
 **Routing**:
-- Site root `/` (README.md) = hub/homepage using `AboutPageLayoutV2`
+- Site root `/` (README.md) = hub/homepage using `AboutPageLayoutV2`. Its frontmatter
+  deliberately carries **no `title`** — see *First-paint translation* for why.
 - `/about` = personal about page using `AboutMePage`
 - `/tech/` = projects hub with sidebar role filters
 - `/article/` = blog article list
-- Navbar: 首页 → `/`, 项目 → `/tech/`, 文章 → `/article/`, 生活(留学/相册/统计), 关于我 → `/about#about-intro`
+- `/guestbook` = `GuestbookBoard` (see *Guestbook*)
+- Also routed but not in the navbar: `/stats/`, `/study/` (hk/uk/singapore), `/travel/`
+- Navbar: 首页 → `/`, 项目 → `/tech/`, 文章 → `/article/`, 留言板 → `/guestbook`,
+  关于我 → `/about`. Two copies exist and **both must change together**:
+  `siteConfig.nav` in `site.config.js` (read by client-side code) and the `navbar:`
+  array passed to `hopeTheme()` in `config.js` (what actually renders).
+
+**Three route tables overlap, and they are not generated from each other:**
+
+1. Hope's `sidebar:` map in `config.js`. `/tech` is built by `buildTechSidebar()` from
+   `projectsCatalog.js`, `/travel/` and `/` use `'structure'` — but **`/article/` is a
+   hand-written array of nine links**. It is the one list `sync-article-index.mjs` does
+   *not* regenerate, so publishing an article updates the article page and the about
+   page and leaves the sidebar stale. Add the entry by hand or accept the gap.
+2. Hope's `redirect` plugin (client-side, in `config.js`) and `vercel.json`'s
+   `redirects` (edge) both carry `/home`, `/home.html`, `/comments`, `/comments/`.
+   A redirect added to only one works in only one of dev/production.
+3. `vercel.json`'s `rewrites` are what make the extensionless URLs work in production
+   (`/about`, `/guestbook`, `/article`). A new extensionless page needs one added.
 
 ## Article Publishing System
 
@@ -135,6 +186,17 @@ once, then commit the regenerated `api/` alongside it.
 
 Also note `copy-api.mjs` only copies `.js` — a `.cjs` helper placed in `docs/api/`
 would never reach the deployed function.
+
+**There is a hard cap of 12 Serverless Functions (Vercel Hobby), and the repo is
+sitting exactly on it.** `api/` currently holds 14 `.js` files; `.vercelignore`
+excludes the two that are local-dev-only (`api/sync.js`, `api/git-push.js`), which
+brings the deployed count to **12/12**. Adding a 15th endpoint without excluding
+something does not fail the build — it fails the deploy at the "Deploying outputs"
+stage, which is what happened the night `api/guestbook.js` went live (see the comment
+in `.vercelignore`). So: before adding an endpoint, either fold it into an existing
+handler behind an `action` field (the pattern `guestbook.js` and `login.js` already
+use) or decide what comes out. `.vercelignore` affects deploy packaging only — those
+two files are still tracked in git and still served by `lkDevApiPlugin` under `dev`.
 
 Endpoints:
 - `/api/publish` - Publish single article
@@ -308,9 +370,15 @@ of `lib/`, which surfaces as "`xyz` is not a function" for code you just fixed.
 
 ### Admin UI (who actually calls those endpoints)
 
-Nothing in Markdown mounts the admin surface — it is four `rootComponents` in
-`client.js`, each wrapped in `ClientOnly`, so it exists on every page and renders
-nothing until `useIsLoggedIn()` (from `utils/authGate.js`) is true:
+Nothing in Markdown mounts the admin surface — it rides in on `client.js`'s
+`rootComponents` array, so it exists on every page and renders nothing until
+`useIsLoggedIn()` (from `utils/authGate.js`) is true. That array has ten entries in
+all; the three admin ones (`LoginGate`, `PublishFab`, `ArticleBatchOps`) are wrapped in
+`ClientOnly` via small `defineComponent` shims at the top of the file, as are
+`NetworkParticlesBg`, `ParticlesNavbarToggle`, `ArticleCategoriesAside` and
+`RoutePageCurtain`. `CursorEffect`, `SiteFooter` and `SettingsFab` are listed raw
+(no `ClientOnly`) — copy the shim pattern if you add anything that touches `window` at
+setup time.
 
 - **`LoginGate.vue`** (~1.9k lines) — the login sheet *and* the whole control panel:
   visitor log + login log, navbar/access prefs (`navPrefs.js`), avatar
@@ -581,7 +649,7 @@ of a request that will only 503.
 - `scripts/push.mjs` - Git push utility with commit message formatting
 - `scripts/sync-article-readme-to-github.mjs` - Syncs README with GitHub
 - `scripts/gen-china-outline.mjs` - Generates China map outline data for `VisitedChinaFootprints`
-- `scripts/sync-starred.mjs` (`npm run sync:stars`) - Pulls a GitHub user's starred repos at build time into `data/starredRepos.generated.js` (`StarredRepos.vue`), same reason as the external-project sync below: runtime `fetch` would miss the pretranslate scan and burn the anonymous 60/hr GitHub rate limit per visitor
+- `scripts/sync-starred.mjs` (`npm run sync:stars`) - Pulls a GitHub user's starred repos at build time into `data/starredRepos.generated.js` (`StarredRepos.vue`), same reason as the external-project sync below: runtime `fetch` would miss the pretranslate scan and burn the anonymous 60/hr GitHub rate limit per visitor. **`StarredRepos.vue` is currently mounted nowhere** — see *Repo layout oddities*.
 - `scripts/sync-ip-asn.mjs` (`npm run sync:ip-asn`) - Downloads MaxMind's GeoLite2-ASN CSV into `lib/lk-ip-asn.generated.json` for the visitor-log bot signal (see **Visitor log** below); needs `MAXMIND_LICENSE_KEY`, skips quietly without it
 - `scripts/sync-external-projects.mjs` / `scripts/onboard-external-project.mjs` - External project sync (see below)
 - `scripts/sync-article-index.mjs` (`npm run sync:articles`, `--check` variant) - Generates `docs/.vuepress/data/articleIndex.generated.js` from `docs/article/*.md` frontmatter; runs automatically before `dev`/`build`. See *Article index* below.
@@ -650,9 +718,11 @@ component, not the markup of the list.
 
 **`__LK_ARTICLE_COUNT__` is not an article count.** `countArticleMarkdown()` in
 `config.js` walks `docs/` recursively and counts every `.md` except `docs/README.md`,
-dotfiles, `agents/`, `skills/`, `*_backup.md` and `test-*.md` — currently ~42, against
-10 real articles in `docs/article/`. `__LK_TECH_COUNT__` is the honest one: flat
-`docs/tech/*.md` minus its README.
+dotfiles, `agents/`, `skills/`, `*_backup.md` and `test-*.md` — currently **43**, against
+**9** real articles in `docs/article/` (10 `.md` there, one of which is the README).
+`__LK_TECH_COUNT__` is the honest one: flat `docs/tech/*.md` minus its README, currently
+**16**. `articleIndex.generated.js` holds 10 entries — the 9 articles plus `my-blog` from
+`EXTRA_ENTRIES`.
 
 ### External Projects Sync
 
@@ -699,6 +769,10 @@ one into a file outside `.env.local` — the API routes read everything from `pr
 - `LK_MAIL_TO` - Where "someone left a message" mails go. Unset = not sent; reply reminders to visitors are unaffected.
 - `RESEND_API_KEY` / `LK_MAIL_FROM` - Guestbook reply notifications. Unset = the address is stored and nothing is sent; a message never fails because mail failed.
 - `TRANSLATE_ALLOWED_ORIGINS` - Extra origins allowed to call `/api/translate-page` (same-origin is always allowed)
+- `LK_VISIT_ALLOWED_ORIGINS` - Same idea for `/api/visit`'s same-site gate
+
+`.env.example` is the authoritative list — it carries all 21 keys with placeholder
+values. Anything readable from `process.env` that is not in there is undocumented.
 
 ### Two repos, and which one deploys the site
 
@@ -811,6 +885,13 @@ Those conventions come from `.cursor/rules/luke-blog-system.mdc`.
   counted in `__LK_ARTICLE_COUNT__`.
 - `.claude/workflows/*.md` predate the current `package.json` and reference scripts that
   no longer exist (e.g. `npm run publish:batch`). Trust `package.json`.
+- **Three components in `docs/.vuepress/components/` are mounted by nothing**:
+  `StarredRepos.vue`, `ThemeTransitionOverlay.vue`, `FloatingShapes.vue` — zero
+  references outside their own files, not in `client.js`'s `rootComponents`, not in
+  `enhance()`, not in any Markdown. `StarredRepos` matters most because
+  `scripts/sync-starred.mjs` (`npm run sync:stars`) still regenerates
+  `data/starredRepos.generated.js` for a card that never renders. Don't debug why the
+  star card "isn't updating" — nothing is displaying it.
 - The repo lives on Windows (`E:\network\page`); the working tree carries a few stray
   files from past shell mishaps (`#`, `{`, `形成死循环。`) that `.gitignore` swallows.
   Don't try to "clean them up" as part of unrelated work.
