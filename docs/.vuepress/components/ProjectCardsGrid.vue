@@ -107,8 +107,10 @@ watch(
   /* 底部不留 padding：右列卡片列表要跟左侧 AI 助手栏（拉伸到同一 grid row 高度）
      视觉上齐平收尾，padding 会在两栏底边之间掺进一段只属于右栏的空隙，让 AI 助手
      卡片看起来比最后一张项目卡「多探出去一截」。整段的底部呼吸感改由
-     .lk-proj-hub-fullbleed 的 padding-bottom 统一提供，两栏共享同一段留白。 */
-  padding: 0.25rem 0 0;
+     .lk-proj-hub-fullbleed 的 padding-bottom 统一提供，两栏共享同一段留白。
+     顶部同理不留 padding：离导航栏的距离由 .lk-proj-hub-layout 的 padding-top
+     统一给，多这 0.25rem 会让本页比 /guestbook、/article 多出 4px。 */
+  padding: 0;
 }
 
 .lk-proj-cards__body {

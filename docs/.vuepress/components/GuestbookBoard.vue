@@ -693,9 +693,9 @@ onMounted(() => {
   gap: 1.2rem;
   max-width: 1220px;
   margin: 0 auto;
-  /* 跟 /about（.lk-aboutme）、/article、/tech 同一条「离导航栏 1.5rem」的规矩，
+  /* 跟 /article、/tech 同一条「离导航栏 1.625rem(26px)」的规矩，
      那几页都是靠自己根节点的 padding-top 撑开，主题的 [vp-content] 本身没有。 */
-  padding-top: 1.5rem;
+  padding-top: 1.625rem;
   /* 两侧留白也是同一件事：把 [vp-content] 的 padding-inline 清零去掉 780px 阅读宽度上限
      之后，两栏在窄于 1220px 的视口下会贴着视口边缘——/article 的 .lk-article-three 是
      靠自己的 padding: 0 1rem 2rem 留白，这里跟它对齐，同一个 1rem。 */

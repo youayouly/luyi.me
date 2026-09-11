@@ -216,8 +216,11 @@ function formatDate(value) {
   /* 280px：跟 guestbook / tech hub / about 的侧栏宽度看齐，统一四个页面的比例。 */
   --lk-article-side-w: 280px;
   --lk-article-gap: 2rem;
-  /* 顶距减为原先 (navbar+0.9rem) 的约 1/3；sticky 单独用安全值避免吸顶时压导航 */
-  --lk-article-content-pad-top: calc((var(--navbar-height, 3.6rem) + 0.9rem) / 3);
+  /* 离导航栏的顶距：写死 1.625rem(26px)，跟 /guestbook(.lk-gb-page) 和
+     /tech(.lk-proj-hub-layout) 用同一个值。原先是 calc((navbar+0.9rem)/3)，
+     在 60px 导航栏下算出 24.8px，跟另两页差一点点、对不齐。
+     sticky 单独用安全值避免吸顶时压导航。 */
+  --lk-article-content-pad-top: 1.625rem;
   /* 与 Projects hub 对齐：max-width 1200；父级为 flex+align-items:center 时勿用 width:100% 撑满整行 */
   width: min(100%, 1200px);
   max-width: 1200px;

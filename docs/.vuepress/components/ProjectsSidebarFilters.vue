@@ -132,7 +132,10 @@ watch(
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  margin-top: 0.35rem;
+  /* 不加 margin-top：顶部与导航栏的间距统一由 .lk-proj-hub-layout 的 padding-top
+     (1.625rem) 提供，跟 /guestbook (.lk-gb-page) 和 /article
+     (.lk-article-three__content) 一致。这里再补 0.35rem 会让本页比那两页多出
+     5.6px，而且比右列 (.lk-proj-cards) 低 1.6px，两栏顶边对不齐。 */
   width: 100%;
   min-height: 0;
 }
